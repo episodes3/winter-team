@@ -1,5 +1,6 @@
 const PASSWORD='rnffjrkdb';
 const members=['윈터','파타','다나','에렌','키엘','브루나'];
+const adManagers=['로건','메이브','젤라'];
 const channels=['주우재','이혜영','도운'];
 const statuses=['기획','촬영예정','촬영완료','편집중','검수중','업로드완료'];
 const workStatuses=['근무중','재택중','연차'];
@@ -122,9 +123,18 @@ function renderHome(){
   const overdue=state.ads.filter(x=>x.final&&x.final<td&&x.status!=='업로드완료');
   $('#homeAlert').classList.toggle('hidden',!overdue.length);if(overdue.length)$('#homeAlert').innerHTML=`<b>주의 필요</b><span>${overdue.length}건 마감 지남</span><strong>📣 ${esc(overdue[0].brand)} 최종본 전달</strong><em>광고</em>`;
   $('#memberBoard').innerHTML=members.map(m=>{
-    const col=memberColors[m],ws=state.memberStatus?.[m]||'근무중';
+    const col=memberColors[m];
+    const memberLeaveEvents=(state.calendarEvents||[]).filter(e=>e.type==='leave'&&(e.member===m||String(e.title||'').startsWith(m+' ')));
+    const onLeaveToday=memberLeaveEvents.some(e=>e.date===td);
+    const hasPastCalendarLeave=memberLeaveEvents.some(e=>e.date&&e.date<td);
+    const savedWs=state.memberStatus?.[m]||'근무중';
+    const ws=onLeaveToday?'연차':(hasPastCalendarLeave&&savedWs==='연차'?'근무중':savedWs);
     const manualTasks=state.todos.filter(t=>t.assignee===m).map(t=>({kind:'todo',id:t.id,title:t.title,status:t.status||'',date:t.due||''}));
-    const uploadTasks=state.uploads.filter(u=>uploadAssignees(u).includes(m)).map(u=>({kind:'upload',id:u.id,title:u.title,status:u.status||'',date:u.date||''}));
+    const weekStart=new Date(td+'T00:00:00');
+    weekStart.setDate(weekStart.getDate()-((weekStart.getDay()+6)%7));
+    const weekEndDate=new Date(weekStart);weekEndDate.setDate(weekEndDate.getDate()+6);
+    const weekStartISO=localDate(weekStart),weekEndISO=localDate(weekEndDate);
+    const uploadTasks=state.uploads.filter(u=>uploadAssignees(u).includes(m)&&u.date&&u.date>=weekStartISO&&u.date<=weekEndISO).map(u=>({kind:'upload',id:u.id,title:u.title,status:u.status||'',date:u.date||''}));
     const tasks=[...manualTasks,...uploadTasks].sort((a,b)=>{
       if(a.date&&b.date)return a.date.localeCompare(b.date);
       if(a.date)return -1;if(b.date)return 1;return 0;
@@ -217,6 +227,9 @@ window.openTodoFor=m=>openModal('todoModal',null,{assignee:m});
 
 let uploadFilter={channel:'전체',type:'전체',assignee:'전체',status:'전체'};
 function uploadAssignees(x){return Array.isArray(x.assignees)&&x.assignees.length?x.assignees:(x.assignee?[x.assignee]:[]);}
+function linkedAd(x){return x?.adId?(state.ads||[]).find(a=>a.id===x.adId):null;}
+function adOptionLabel(a){return `${a.brand||'브랜드 미정'} · ${a.channel||'채널 미정'}${a.month?` · ${a.month}`:''}`;}
+
 function inferredEditRange(x,m){
   if(x.editRanges&&x.editRanges[m]&&x.editRanges[m].start&&x.editRanges[m].end)return x.editRanges[m];
   if(!x.date)return {start:'',end:''};
@@ -233,7 +246,7 @@ function renderUploads(){
     return true;
   }).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
   const weeks=[];data.forEach(x=>{const d=new Date((x.date||localDate())+'T00:00:00');const monday=new Date(d);monday.setDate(d.getDate()-((d.getDay()+6)%7));const key=localDate(monday);let w=weeks.find(q=>q.key===key);if(!w){w={key,monday,items:[]};weeks.push(w)}w.items.push(x)});
-  $('#uploadSchedule').innerHTML=weeks.length?weeks.map(w=>{const left=w.items.filter(x=>x.channel==='주우재'),mid=w.items.filter(x=>x.channel==='이혜영'),right=w.items.filter(x=>x.channel==='도운');const card=x=>`<div class="upload-card ${channelClass[x.channel]}" onclick="editItem('uploads','${x.id}')"><div>${channelPill(x.channel)} <b>${esc(x.title)}</b>${x.sevenNeed?'<span class="seven-star">⭐ 광고 영상</span>':''}</div><span>${esc(uploadAssignees(x).join(', ')||'미정')} &nbsp; ↑ ${esc(x.date||'미정')}</span><em>${statusBadge(x.status)}</em></div>`;return `<div class="week-row"><div class="week-date"><b>${fmtDate(w.key)}</b><small>${w.monday.getMonth()+1}월 ${Math.ceil(w.monday.getDate()/7)}주</small></div><div class="week-channel">${left.map(card).join('')||'<i>—</i>'}</div><div class="week-channel">${mid.map(card).join('')||'<i>—</i>'}</div><div class="week-channel">${right.map(card).join('')||'<i>—</i>'}</div></div>`}).join(''):'<div class="empty large-empty">조건에 맞는 업로드 일정이 없어요.</div>';
+  $('#uploadSchedule').innerHTML=weeks.length?weeks.map(w=>{const left=w.items.filter(x=>x.channel==='주우재'),mid=w.items.filter(x=>x.channel==='이혜영'),right=w.items.filter(x=>x.channel==='도운');const card=x=>`<div class="upload-card ${channelClass[x.channel]}" onclick="editItem('uploads','${x.id}')"><div>${channelPill(x.channel)} <b>${esc(x.title)}</b>${x.sevenNeed?'<span class="seven-star">⭐ 광고 영상</span>':''}${linkedAd(x)?`<span class="linked-ad-badge">AD · ${esc(linkedAd(x).brand||'광고')}</span>`:''}</div><span>${esc(uploadAssignees(x).join(', ')||'미정')} &nbsp; ↑ ${esc(x.date||'미정')}</span><em>${statusBadge(x.status)}</em></div>`;return `<div class="week-row"><div class="week-date"><b>${fmtDate(w.key)}</b><small>${w.monday.getMonth()+1}월 ${Math.ceil(w.monday.getDate()/7)}주</small></div><div class="week-channel">${left.map(card).join('')||'<i>—</i>'}</div><div class="week-channel">${mid.map(card).join('')||'<i>—</i>'}</div><div class="week-channel">${right.map(card).join('')||'<i>—</i>'}</div></div>`}).join(''):'<div class="empty large-empty">조건에 맞는 업로드 일정이 없어요.</div>';
   renderEditTimeline(data.length?data:state.uploads);
 }
 window.setUploadFilter=(k,v)=>{uploadFilter[k]=v;renderUploads();};
@@ -265,15 +278,41 @@ function renderEditTimeline(items){
 }
 function openUploadModal(id=null){
   const existing=id?state.uploads.find(x=>x.id===id):null;
-  const vals=existing||{channel:channels[0],type:'롱폼',title:'',date:localDate(),status:'기획',sevenNeed:false,firstDraftDate:'',memo:''};
+  const vals=existing||{channel:channels[0],type:'롱폼',title:'',date:localDate(),status:'기획',sevenNeed:false,firstDraftDate:'',adId:'',memo:''};
   const selected=uploadAssignees(vals),ranges=Object.fromEntries(members.map(m=>[m,inferredEditRange(vals,m)]));
-  $('#modalRoot').innerHTML=`<div class="modal-backdrop upload-modal-backdrop"><div class="modal upload-edit-modal"><div class="modal-head"><h3>${existing?'업로드 일정 수정':'업로드 일정 추가'}</h3><button class="icon-btn" id="closeModal">×</button></div><form id="uploadEditForm"><div class="upload-form-grid"><label>채널<select name="channel">${channels.map(ch=>`<option ${ch===vals.channel?'selected':''}>${ch}</option>`).join('')}</select></label><div class="upload-type-block"><span>영상 유형</span><div class="upload-type-options">${['롱폼','쇼츠','라이브','기타'].map(t=>`<label class="type-option"><input type="radio" name="type" value="${t}" ${t===(vals.type||'롱폼')?'checked':''}><span>${t==='롱폼'?'🎬':t==='쇼츠'?'📱':'▣'} ${t}</span></label>`).join('')}</div></div><label class="full">영상 제목<input name="title" value="${esc(vals.title||'')}" required></label><div class="full assignee-editor"><div class="field-label">담당자 <em>(선택하면 편집 기간 입력 가능)</em></div>${members.map(m=>`<div class="assignee-range-row"><label class="assignee-check"><input type="checkbox" name="assignees" value="${m}" ${selected.includes(m)?'checked':''}><span>${m}</span></label><div class="range-inputs ${selected.includes(m)?'':'disabled'}" data-range="${m}"><input type="date" data-start="${m}" value="${esc(ranges[m]?.start||'')}"><span>~</span><input type="date" data-end="${m}" value="${esc(ranges[m]?.end||'')}"></div></div>`).join('')}</div><label>예정 업로드일<input type="date" name="date" value="${esc(vals.date||'')}"></label><label>상태<select name="status">${statuses.map(st=>`<option ${st===vals.status?'selected':''}>${st}</option>`).join('')}</select></label><label class="full seven-check ad-video-check"><input type="checkbox" name="sevenNeed" ${vals.sevenNeed?'checked':''}><span>⭐️ 광고 영상</span></label><label class="full first-draft-field ${vals.sevenNeed?'':'hidden'}" id="firstDraftDateField">1차 가편본 전달일<input type="date" name="firstDraftDate" value="${esc(vals.firstDraftDate||'')}"></label><label class="full">메모 (선택)<textarea name="memo" placeholder="추가 메모가 있다면 입력하세요!">${esc(vals.memo||'')}</textarea></label></div><div class="modal-actions upload-actions">${existing?'<button type="button" class="danger-btn" id="deleteUpload">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div></form></div></div>`;
+  const adOptions=(channel,selectedId='')=>{
+    const same=(state.ads||[]).filter(a=>a.channel===channel);
+    const linked=selectedId?(state.ads||[]).find(a=>a.id===selectedId):null;
+    const list=[...same]; if(linked&&!list.some(a=>a.id===linked.id))list.unshift(linked);
+    return `<option value="">광고 선택</option>${list.map(a=>`<option value="${a.id}" ${a.id===selectedId?'selected':''}>${esc(adOptionLabel(a))}</option>`).join('')}`;
+  };
+  $('#modalRoot').innerHTML=`<div class="modal-backdrop upload-modal-backdrop"><div class="modal upload-edit-modal"><div class="modal-head"><h3>${existing?'업로드 일정 수정':'업로드 일정 추가'}</h3><button class="icon-btn" id="closeModal">×</button></div><form id="uploadEditForm"><div class="upload-form-grid">
+    <label>채널<select name="channel" id="uploadChannelSelect">${channels.map(ch=>`<option ${ch===vals.channel?'selected':''}>${ch}</option>`).join('')}</select></label>
+    <div class="upload-type-block"><span>영상 유형</span><div class="upload-type-options">${['롱폼','쇼츠','라이브','기타'].map(t=>`<label class="type-option"><input type="radio" name="type" value="${t}" ${t===(vals.type||'롱폼')?'checked':''}><span>${t==='롱폼'?'🎬':t==='쇼츠'?'📱':'▣'} ${t}</span></label>`).join('')}</div></div>
+    <label class="full">영상 제목<input name="title" value="${esc(vals.title||'')}" required></label>
+    <div class="full assignee-editor"><div class="field-label">담당자 <em>(선택하면 편집 기간 입력 가능)</em></div>${members.map(m=>`<div class="assignee-range-row"><label class="assignee-check"><input type="checkbox" name="assignees" value="${m}" ${selected.includes(m)?'checked':''}><span>${m}</span></label><div class="range-inputs ${selected.includes(m)?'':'disabled'}" data-range="${m}"><input type="date" data-start="${m}" value="${esc(ranges[m]?.start||'')}"><span>~</span><input type="date" data-end="${m}" value="${esc(ranges[m]?.end||'')}"></div></div>`).join('')}</div>
+    <label>예정 업로드일<input type="date" name="date" value="${esc(vals.date||'')}"></label>
+    <label>상태<select name="status">${statuses.map(st=>`<option ${st===vals.status?'selected':''}>${st}</option>`).join('')}</select></label>
+    <label class="full seven-check ad-video-check"><input type="checkbox" name="sevenNeed" ${vals.sevenNeed?'checked':''}><span>⭐️ 광고 영상</span></label>
+    <label class="full upload-ad-link-field ${vals.sevenNeed?'':'hidden'}" id="uploadAdLinkField">어떤 광고인가요?
+      <select name="adId" id="uploadAdSelect">${adOptions(vals.channel,vals.adId||'')}</select>
+      <small>${(state.ads||[]).length?'광고 탭에 등록된 같은 채널의 광고가 표시돼요.':'광고 탭에 광고 건을 먼저 등록해주세요.'}</small>
+    </label>
+    <label class="full first-draft-field ${vals.sevenNeed?'':'hidden'}" id="firstDraftDateField">1차 가편본 전달일<input type="date" name="firstDraftDate" value="${esc(vals.firstDraftDate||'')}"></label>
+    <label class="full">메모 (선택)<textarea name="memo" placeholder="추가 메모가 있다면 입력하세요!">${esc(vals.memo||'')}</textarea></label>
+  </div><div class="modal-actions upload-actions">${existing?'<button type="button" class="danger-btn" id="deleteUpload">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div></form></div></div>`;
   $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
-  $$('input[name="assignees"]').forEach(cb=>cb.addEventListener('change',()=>{const box=document.querySelector(`[data-range="${cb.value}"]`);box.classList.toggle('disabled',!cb.checked);if(cb.checked&&!box.querySelector('input').value&&vals.date){const r=inferredEditRange({...vals,date:vals.date},cb.value);box.querySelector(`[data-start="${cb.value}"]`).value=r.start;box.querySelector(`[data-end="${cb.value}"]`).value=r.end;}}));
-  const adVideoCb=document.querySelector('input[name="sevenNeed"]'),firstDraftField=$('#firstDraftDateField');
-  if(adVideoCb&&firstDraftField)adVideoCb.addEventListener('change',()=>{firstDraftField.classList.toggle('hidden',!adVideoCb.checked);if(!adVideoCb.checked){const input=firstDraftField.querySelector('input[name="firstDraftDate"]');if(input)input.value='';}});
+  $$('input[name="assignees"]').forEach(cb=>cb.addEventListener('change',()=>{const box=document.querySelector(`[data-range="${cb.value}"]`);box.classList.toggle('disabled',!cb.checked);}));
+  const adVideoCb=document.querySelector('input[name="sevenNeed"]'),firstDraftField=$('#firstDraftDateField'),adLinkField=$('#uploadAdLinkField'),adSelect=$('#uploadAdSelect'),channelSelect=$('#uploadChannelSelect');
+  adVideoCb?.addEventListener('change',()=>{const on=adVideoCb.checked;firstDraftField.classList.toggle('hidden',!on);adLinkField.classList.toggle('hidden',!on);if(!on){firstDraftField.querySelector('input').value='';adSelect.value='';}});
+  channelSelect?.addEventListener('change',()=>{adSelect.innerHTML=adOptions(channelSelect.value,adSelect.value);});
   if(existing)$('#deleteUpload').onclick=()=>{deleteById('uploads',existing.id);closeModal();};
-  $('#uploadEditForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),assignees=fd.getAll('assignees');const isAdVideo=fd.get('sevenNeed')==='on';const obj={channel:fd.get('channel'),type:fd.get('type'),title:fd.get('title').trim(),date:fd.get('date'),status:fd.get('status'),sevenNeed:isAdVideo,firstDraftDate:isAdVideo?(fd.get('firstDraftDate')||''):'',memo:fd.get('memo')||'',assignees,assignee:assignees[0]||'' ,editRanges:{}};assignees.forEach(m=>{obj.editRanges[m]={start:document.querySelector(`[data-start="${m}"]`).value,end:document.querySelector(`[data-end="${m}"]`).value};});if(existing)Object.assign(existing,obj);else state.uploads.push({id:uid(),...obj});save();closeModal();};
+  $('#uploadEditForm').onsubmit=e=>{
+    e.preventDefault();const fd=new FormData(e.target),assignees=fd.getAll('assignees'),isAdVideo=fd.get('sevenNeed')==='on';
+    const obj={channel:fd.get('channel'),type:fd.get('type'),title:fd.get('title').trim(),date:fd.get('date'),status:fd.get('status'),sevenNeed:isAdVideo,adId:isAdVideo?(fd.get('adId')||''):'',firstDraftDate:isAdVideo?(fd.get('firstDraftDate')||''):'',memo:fd.get('memo')||'',assignees,assignee:assignees[0]||'',editRanges:{}};
+    assignees.forEach(m=>{obj.editRanges[m]={start:document.querySelector(`[data-start="${m}"]`).value,end:document.querySelector(`[data-end="${m}"]`).value};});
+    if(existing)Object.assign(existing,obj);else state.uploads.push({id:uid(),...obj});save();closeModal();
+  };
 }
 window.openUploadModal=openUploadModal;
 
@@ -1017,7 +1056,7 @@ const modalDefs={
   todoModal:{title:'업무 추가',key:'todos',fields:[['title','업무 내용','text'],['assignee','담당자','select',members],['channel','채널','select',channels],['status','상태','select',statuses],['due','마감일','date']]},
   uploadModal:{title:'업로드 일정',key:'uploads',fields:[['channel','채널','select',channels],['type','유형','select',['롱폼','쇼츠','라이브','기타']],['title','영상 제목','text'],['assignee','담당자','select',members],['date','업로드일','date'],['status','상태','select',statuses]]},
   shootModal:{title:'촬영 정보',key:'shoots',fields:[['channel','채널','select',channels],['title','영상 제목','text'],['assignee','담당 PD','select',members],['date','촬영일','date'],['method','촬영 방식','select',['PD 자체 촬영','촬영팀 동행','셀프캠','기타']],['crew','촬영팀 / 참여자 (쉼표 구분)','text'],['equipment','장비','text'],['notes','준비사항 / 유의사항','textarea']]},
-  adModal:{title:'광고 정보',key:'ads',fields:[['channel','채널','select',channels],['brand','브랜드','text'],['product','제품','text'],['adType','광고 유형','select',['BDC','기획PPL','단순PPL','브랜디드','기타']],['assignee','담당자','select',members],['amount','금액','number'],['month','진행 월','month'],['status','상태','select',statuses],['proposal','구성안 전달일','date'],['rough','가편 전달일','date'],['final','최종본 전달일','date'],['memo','메모','textarea']]},
+  adModal:{title:'광고 정보',key:'ads',fields:[['channel','채널','select',channels],['brand','브랜드','text'],['adType','광고 유형','select',['BDC','기획PPL','단순PPL','브랜디드','기타']],['assignee','광고 담당자','select',adManagers],['amount','금액','number'],['month','진행 월','month'],['status','상태','select',statuses],['proposal','구성안 전달일','date'],['rough','가편 전달일','date'],['final','최종본 전달일','date'],['memo','메모','textarea']]},
   meetingModal:{title:'회의록 추가',key:'meetings',fields:[['title','회의 제목','text'],['date','날짜','date'],['week','주차','select',['1','2','3','4','5']]]},
   resourceModal:{title:'링크 추가',key:'resources',fields:[]},
   noticeModal:{title:'공지 작성',key:'notices',fields:[['channel','채널','select',['전체',...channels]],['title','제목','text'],['content','내용','textarea'],['author','작성자','select',members]]}
@@ -1026,7 +1065,7 @@ $$('[data-open]').forEach(b=>b.addEventListener('click',()=>openModal(b.dataset.
 function openModal(name,id=null,preset={}){
   if(name==='uploadModal'){openUploadModal(id);return;}if(name==='shootModal'){openShootModal(id);return;}if(name==='resourceModal'){openResourceModal(id);return;}if(name==='ideaModal'){openIdeaModal(id,preset);return;}
   const d=modalDefs[name], existing=id?state[d.key].find(x=>x.id===id):null,values={...existing,...preset};
-  const fields=d.fields.map(([n,l,t,opts])=>{const val=values[n]??'';let input=t==='select'?`<select name="${n}">${opts.map(o=>`<option value="${esc(o)}" ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select>`:t==='textarea'?`<textarea name="${n}">${esc(val)}</textarea>`:`<input name="${n}" type="${t}" value="${esc(val)}" />`;return `<label class="${t==='textarea'?'full':''}">${l}${input}</label>`;}).join('');
+  const fields=d.fields.map(([n,l,t,opts])=>{const val=values[n]??'';let input=t==='select'?`<select name="${n}">${val&&!opts.includes(val)?`<option value="${esc(val)}" selected>${esc(val)} (기존)</option>`:''}${opts.map(o=>`<option value="${esc(o)}" ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select>`:t==='textarea'?`<textarea name="${n}">${esc(val)}</textarea>`:`<input name="${n}" type="${t}" value="${esc(val)}" />`;return `<label class="${t==='textarea'?'full':''}">${l}${input}</label>`;}).join('');
   const modalTitle=(name==='todoModal'&&existing)?'업무 수정':d.title;
   $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal"><div class="modal-head"><h3>${modalTitle}</h3><button class="icon-btn" id="closeModal">×</button></div><form id="modalForm"><div class="form-grid">${fields}</div><div class="modal-actions">${existing?`<button type="button" class="danger-btn" id="deleteModal">삭제</button>`:''}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div></form></div></div>`;
   $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;if(existing)$('#deleteModal').onclick=()=>{deleteById(d.key,existing.id);closeModal();};
@@ -1040,4 +1079,6 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-notice-vie
 $('#globalSearch').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();$$('.member-card,.resource-tr,.resource-memo-card,.doc,.simple-row,.upload-card,.shoot-card,.ad-row,.idea-card').forEach(el=>el.style.display=!q||el.textContent.toLowerCase().includes(q)?'':'none');});
 $('#exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='우리팀-잘-굴러가유-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);};
 $('#todayLabel').textContent=new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date());
+window.addEventListener('focus',()=>renderHome());
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)renderHome();});
 renderAll();
