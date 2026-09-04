@@ -759,3 +759,30 @@
 .assignee-range-row .range-inputs.hidden-until-selected{
   display:none !important;
 }
+
+/* V3.50 idea archive common color + categories */
+.idea-card{
+  --idea-bg:#f7f7f5;
+  --idea-line:#9a9a92;
+  border-color:#e4e4df !important;
+  border-top-color:#a7a79f !important;
+  background:linear-gradient(180deg,#f7f7f5 0,#fff 60%) !important;
+}
+.idea-card-bottom>span{color:#777 !important}
+.idea-card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.idea-category{
+  display:inline-flex;
+  align-items:center;
+  padding:4px 8px;
+  border-radius:99px;
+  background:#ededE9;
+  border:1px solid #dfdfda;
+  color:#666;
+  font-size:9px;
+  font-weight:700;
+}
+.idea-proposer{
+  background:#fff !important;
+  border-color:#e5e5e2 !important;
+  color:#666 !important;
+}

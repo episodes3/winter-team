@@ -1,5 +1,6 @@
 const PASSWORD='rnffjrkdb';
 const members=['윈터','파타','다나','에렌','키엘','브루나'];
+const ideaCategories=['패션','뷰티','브이로그','예능','기타'];
 const adManagers=['로건','메이브','젤라'];
 const channels=['주우재','이혜영','도운'];
 const statuses=['기획','촬영예정','촬영완료','편집중','검수중','업로드완료'];
@@ -77,7 +78,7 @@ function seed(){
 function load(){
   const saved=JSON.parse(localStorage.getItem('teamDashDataV3')||'null');
   if(saved){
-    saved.ideas=Array.isArray(saved.ideas)?saved.ideas.map(x=>({...x,archived:Boolean(x.archived),comments:Array.isArray(x.comments)?x.comments:[]})):[];
+    saved.ideas=Array.isArray(saved.ideas)?saved.ideas.map(x=>({...x,archived:Boolean(x.archived),comments:Array.isArray(x.comments)?x.comments:[],category:x.category||'기타'})):[];
     saved.homeTodos=Array.isArray(saved.homeTodos)?saved.homeTodos:[];
     saved.memberRemoteDays=saved.memberRemoteDays&&typeof saved.memberRemoteDays==='object'?saved.memberRemoteDays:{};
     members.forEach(m=>{if(!Array.isArray(saved.memberRemoteDays[m]))saved.memberRemoteDays[m]=[];});
@@ -599,9 +600,8 @@ function renderIdeas(){
   const list=(ideaView==='archive'?archived:active).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   const grid=$('#ideaGrid');if(!grid)return;
   grid.innerHTML=list.length?list.map(x=>{
-    const c=memberColors[x.proposer]||{bg:'#f7f7f5',line:'#aaa'};
-    return `<article class="idea-card ${x.archived?'idea-archived':''}" style="--idea-bg:${c.bg};--idea-line:${c.line}" onclick="openModal('ideaModal','${x.id}')">
-      <div class="idea-card-top"><span class="idea-proposer">${esc(x.proposer||'미정')} PD</span><small>${esc(x.createdAt||'')}</small></div>
+    return `<article class="idea-card ${x.archived?'idea-archived':''}" onclick="openModal('ideaModal','${x.id}')">
+      <div class="idea-card-top"><div class="idea-card-meta"><span class="idea-category">${esc(x.category||'기타')}</span><span class="idea-proposer">${esc(x.proposer||'미정')} PD</span></div><small>${esc(x.createdAt||'')}</small></div>
       <h3>${esc(x.title||'제목 없음')}</h3>
       <p>${esc(x.content||'').replace(/\n/g,'<br>')}</p>
       <div class="idea-card-actions">
@@ -618,7 +618,7 @@ window.setIdeaView=view=>{ideaView=view;renderIdeas();};
 function openIdeaModal(id=null,preset={}){
   state.ideas=Array.isArray(state.ideas)?state.ideas:[];
   const existing=id?state.ideas.find(x=>x.id===id):null;
-  const vals={title:'',content:'',proposer:members[0],archived:false,comments:[],...existing,...preset};
+  const vals={title:'',content:'',proposer:members[0],category:'기타',archived:false,comments:[],...existing,...preset};
   vals.comments=Array.isArray(vals.comments)?vals.comments:[];
 
   const commentRows=vals.comments.length?vals.comments.map(c=>ideaCommentHTML(c,id)).join(''):'<div class="idea-comment-empty">아직 댓글이 없어요.</div>';
@@ -629,6 +629,7 @@ function openIdeaModal(id=null,preset={}){
       <div class="idea-detail-form">
         <label>아이디어 제목<input name="title" value="${esc(vals.title||'')}" required></label>
         <label>내용<textarea name="content" required>${esc(vals.content||'')}</textarea></label>
+        <label>카테고리<select name="category">${ideaCategories.map(c=>`<option value="${c}" ${c===(vals.category||'기타')?'selected':''}>${c}</option>`).join('')}</select></label>
         <label>제안자<select name="proposer">${members.map(m=>`<option value="${m}" ${m===vals.proposer?'selected':''}>${m}</option>`).join('')}</select></label>
       </div>
       <div class="modal-actions">${existing?'<button type="button" class="danger-btn" id="deleteIdea">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div>
@@ -650,7 +651,7 @@ function openIdeaModal(id=null,preset={}){
   $('#ideaDetailForm').onsubmit=e=>{
     e.preventDefault();
     const fd=new FormData(e.target);
-    const obj={title:String(fd.get('title')||'').trim(),content:String(fd.get('content')||'').trim(),proposer:String(fd.get('proposer')||members[0])};
+    const obj={title:String(fd.get('title')||'').trim(),content:String(fd.get('content')||'').trim(),category:String(fd.get('category')||'기타'),proposer:String(fd.get('proposer')||members[0])};
     if(existing){
       Object.assign(existing,obj);
       save();
