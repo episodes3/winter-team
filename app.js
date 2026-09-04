@@ -12,8 +12,8 @@ const meetingSectionDefs=[
   {title:'💬 기타',tone:'etc'}
 ];
 const memberColors={
-  '윈터':{bg:'#fff0f5',line:'#ef5a87'},'파타':{bg:'#eef7ff',line:'#74aee8'},'다나':{bg:'#fff1ed',line:'#ff725f'},
-  '에렌':{bg:'#edf9f6',line:'#47baa9'},'키엘':{bg:'#fff8e6',line:'#f3b940'},'브루나':{bg:'#f7f0fc',line:'#bb8ddd'}
+  '윈터': {bg:'#eef8ff', line:'#68b7e8'},'파타': {bg:'#eef9f0', line:'#69b879'},'다나': {bg:'#fff0f6', line:'#ed7eaa'},
+  '에렌': {bg:'#fff3e8', line:'#ee9850'},'키엘':{bg:'#fff8e6',line:'#f3b940'},'브루나':{bg:'#f7f0fc',line:'#bb8ddd'}
 };
 const channelClass={'주우재':'joo','이혜영':'hye','도운':'dow','전체':'all'};
 const channelLabel={'주우재':'주우재','이혜영':'이혜영','도운':'도운'};
@@ -24,6 +24,7 @@ function addDaysISO(n){const d=new Date();d.setDate(d.getDate()+n);return localD
 function seed(){
   return {
     memberStatus:Object.fromEntries(members.map((m,i)=>[m,i===3?'연차':(i===1||i===5?'재택중':'근무중')])),
+    memberRemoteDays:Object.fromEntries(members.map(m=>[m,[]])),
     todos:[
       {id:uid(),title:'촬영 준비 리스트 확인',assignee:'윈터',channel:'주우재',status:'촬영예정',due:''},
       {id:uid(),title:'업로드 스케줄 정리',assignee:'파타',channel:'이혜영',status:'기획',due:''},
@@ -70,7 +71,13 @@ function seed(){
 }
 function load(){
   const saved=JSON.parse(localStorage.getItem('teamDashDataV3')||'null');
-  if(saved){saved.ideas=Array.isArray(saved.ideas)?saved.ideas.map(x=>({...x,archived:Boolean(x.archived)})):[];saved.homeTodos=Array.isArray(saved.homeTodos)?saved.homeTodos:[];return saved;}
+  if(saved){
+    saved.ideas=Array.isArray(saved.ideas)?saved.ideas.map(x=>({...x,archived:Boolean(x.archived)})):[];
+    saved.homeTodos=Array.isArray(saved.homeTodos)?saved.homeTodos:[];
+    saved.memberRemoteDays=saved.memberRemoteDays&&typeof saved.memberRemoteDays==='object'?saved.memberRemoteDays:{};
+    members.forEach(m=>{if(!Array.isArray(saved.memberRemoteDays[m]))saved.memberRemoteDays[m]=[];});
+    return saved;
+  }
   const old=JSON.parse(localStorage.getItem('teamDashDataV2')||'null'); const base=seed();
   if(old){['todos','homeTodos','uploads','shoots','ads','meetings','notices','schedules','resources','ideas'].forEach(k=>{if(old[k]?.length)base[k]=old[k].map(x=>({...x,id:x.id||uid()}));});}
   return base;
@@ -107,7 +114,9 @@ function renderHome(){
       if(a.date&&b.date)return a.date.localeCompare(b.date);
       if(a.date)return -1;if(b.date)return 1;return 0;
     }).slice(0,6);
-    return `<article class="member-card" style="--member-bg:${col.bg};--member-line:${col.line}"><div class="member-head"><div class="member-name"><span class="avatar" style="background:${col.line}">${m[0]}</span><div><b>${m}</b><small>${workBadge(ws)}</small></div></div><select class="work-select" onchange="setWorkStatus('${m}',this.value)">${workStatuses.map(s=>`<option ${s===ws?'selected':''}>${s}</option>`).join('')}</select></div><div class="member-tasks">${tasks.length?tasks.map(t=>t.kind==='upload'?`<div class="mini-task upload-mini-task" onclick="openUploadModal('${t.id}')" title="업로드 일정 수정"><span><b class="mini-task-kind">업로드</b>${esc(t.title)}</span><div class="mini-task-right"><em>${t.date?fmtDate(t.date):esc(t.status)}</em></div></div>`:`<div class="mini-task" onclick="openModal('todoModal','${t.id}')" title="클릭해서 수정"><span>○ &nbsp;${esc(t.title)}</span><div class="mini-task-right"><em>${esc(t.status)}</em><button type="button" class="mini-task-delete" onclick="event.stopPropagation();deleteById('todos','${t.id}')" title="업무 삭제">×</button></div></div>`).join(''):'<div class="no-task">등록된 업무가 없어요.</div>'}</div><button class="member-add" onclick="openTodoFor('${m}')">+ 업무 추가</button></article>`;
+    const remoteDays=state.memberRemoteDays?.[m]||[];
+    const remoteDayButtons=['월','화','수','목','금'].map(day=>`<button type="button" class="remote-day-btn ${remoteDays.includes(day)?'active':''}" onclick="toggleRemoteDay('${m}','${day}')">${day}</button>`).join('');
+    return `<article class="member-card" style="--member-bg:${col.bg};--member-line:${col.line}"><div class="member-head"><div class="member-name"><span class="avatar" style="background:${col.line}">${m[0]}</span><div><b>${m}</b><small>${workBadge(ws)}</small></div></div><select class="work-select" onchange="setWorkStatus('${m}',this.value)">${workStatuses.map(s=>`<option ${s===ws?'selected':''}>${s}</option>`).join('')}</select></div><div class="remote-days-wrap"><span>재택근무</span><div class="remote-day-list">${remoteDayButtons}</div></div><div class="member-tasks">${tasks.length?tasks.map(t=>t.kind==='upload'?`<div class="mini-task upload-mini-task" onclick="openUploadModal('${t.id}')" title="업로드 일정 수정"><span><b class="mini-task-kind">업로드</b>${esc(t.title)}</span><div class="mini-task-right"><em>${t.date?fmtDate(t.date):esc(t.status)}</em></div></div>`:`<div class="mini-task" onclick="openModal('todoModal','${t.id}')" title="클릭해서 수정"><span>○ &nbsp;${esc(t.title)}</span><div class="mini-task-right"><em>${esc(t.status)}</em><button type="button" class="mini-task-delete" onclick="event.stopPropagation();deleteById('todos','${t.id}')" title="업무 삭제">×</button></div></div>`).join(''):'<div class="no-task">등록된 업무가 없어요.</div>'}</div><button class="member-add" onclick="openTodoFor('${m}')">+ 업무 추가</button></article>`;
   }).join('');
   const shoots=[...state.shoots].filter(x=>x.date).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);$('#homeShoots').innerHTML=shoots.length?shoots.map(x=>`<div class="simple-row">${channelPill(x.channel)}<b>${esc(x.title)}</b><small>${fmtDate(x.date)} · ${esc(x.assignee)}</small></div>`).join(''):'<div class="empty">등록된 촬영이 없어요.</div>';
   $('#homeNotices').innerHTML=state.notices.length?[...state.notices].reverse().slice(0,5).map(x=>`<div class="simple-row">${channelPill(x.channel)}<b>${esc(x.title)}</b><small>${esc(x.author)}</small></div>`).join(''):'<div class="empty">공지사항이 없어요.</div>';
@@ -180,6 +189,15 @@ function openHomeTodoModal(id=null){
 window.openHomeTodoModal=openHomeTodoModal;
 
 window.setWorkStatus=(m,v)=>{state.memberStatus=state.memberStatus||{};state.memberStatus[m]=v;save();};
+window.toggleRemoteDay=(m,day)=>{
+  state.memberRemoteDays=state.memberRemoteDays||{};
+  const days=Array.isArray(state.memberRemoteDays[m])?[...state.memberRemoteDays[m]]:[];
+  const i=days.indexOf(day);
+  if(i>=0)days.splice(i,1);else days.push(day);
+  const order=['월','화','수','목','금'];
+  state.memberRemoteDays[m]=days.sort((a,b)=>order.indexOf(a)-order.indexOf(b));
+  save();
+};
 window.openTodoFor=m=>openModal('todoModal',null,{assignee:m});
 
 let uploadFilter={channel:'전체',type:'전체',assignee:'전체',status:'전체'};
@@ -352,10 +370,10 @@ function renderMeetingMonth(year,month,week='1'){
   const activeWeek=String(selected.week||week);
   const itemHTML=(it,ii,si)=>{
     const obj=typeof it==='string'?{text:it,format:'bullet',mentions:[],related:''}:it;
-    const icon=obj.format==='check'?'☐':'•';
+    const icon=obj.format==='check'?`<button type="button" class="meeting-check ${obj.checked?'checked':''}" onclick="event.stopPropagation();toggleMeetingCheck('${selected.id}',${si},${ii})" aria-label="체크">${obj.checked?'✓':''}</button>`:'<span class="meeting-bullet">•</span>';
     const mentions=(obj.mentions||[]).map(m=>`<span class="meeting-mention">@${esc(m)}</span>`).join('');
     const related=obj.related?`<small class="meeting-related">↳ ${esc(obj.related)}</small>`:'';
-    return `<div class="meeting-item ${obj.format==='check'?'check-item':''}"><span class="meeting-item-icon">${icon}</span><div class="meeting-item-body"><span>${obj.richHtml?sanitizeMeetingRich(obj.richHtml):esc(obj.text||'')}</span>${related}${mentions?`<div class="meeting-mentions-inline">${mentions}</div>`:''}</div><div class="meeting-item-actions"><button onclick="editMeetingItem('${selected.id}',${si},${ii})">수정</button><button onclick="deleteMeetingItem('${selected.id}',${si},${ii})">×</button></div></div>`;
+    return `<div class="meeting-item ${obj.format==='check'?'check-item':''} ${obj.checked?'checked-item':''}"><span class="meeting-item-icon">${icon}</span><div class="meeting-item-body"><span>${obj.richHtml?sanitizeMeetingRich(obj.richHtml):esc(obj.text||'')}</span>${related}${mentions?`<div class="meeting-mentions-inline">${mentions}</div>`:''}</div><div class="meeting-item-actions"><button onclick="editMeetingItem('${selected.id}',${si},${ii})">수정</button><button onclick="deleteMeetingItem('${selected.id}',${si},${ii})">×</button></div></div>`;
   };
   $('#meetingDetail').innerHTML=`<div class="meeting-detail-head"><button class="back-btn" onclick="renderMeetingsLanding()">← 뒤로</button><h1>${year}년 ${month}월 회의록</h1></div>
   <div class="week-tabs">${['1','2','3','4','5'].map(w=>`<button class="${activeWeek===w?'active':''}" onclick="renderMeetingMonth(${year},${month},'${w}')">${w}주차</button>`).join('')}<button class="week-plus" onclick="addMeetingWeek(${year},${month})">+ 주차</button></div>
@@ -367,6 +385,17 @@ function renderMeetingMonth(year,month,week='1'){
   </section>`).join('')}</div>`;
 }
 window.renderMeetingMonth=renderMeetingMonth;window.renderMeetingsLanding=renderMeetingsLanding;
+window.toggleMeetingCheck=(meetingId,sectionIndex,itemIndex)=>{
+  const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;normalizeMeetingSections(m);
+  const raw=m.sections?.[sectionIndex]?.items?.[itemIndex];if(raw==null)return;
+  if(typeof raw==='string'){
+    m.sections[sectionIndex].items[itemIndex]={text:raw,richHtml:esc(raw),format:'check',mentions:[],related:'',checked:true};
+  }else{
+    raw.checked=!Boolean(raw.checked);
+  }
+  localStorage.setItem('teamDashDataV3',JSON.stringify(state));
+  renderMeetingMonth(new Date(m.date+'T00:00:00').getFullYear(),new Date(m.date+'T00:00:00').getMonth()+1,String(m.week||'1'));
+};
 
 function meetingRelatedOptions(){
   const rows=[

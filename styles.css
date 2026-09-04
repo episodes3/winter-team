@@ -250,3 +250,18 @@
 .home-todo-editor{min-height:150px;padding:13px 14px;border:1px solid #d8d8d3;border-radius:10px;background:#fff;color:#333;font-size:12px;line-height:1.7;outline:none}
 .home-todo-editor:focus{border-color:#b7c98a;box-shadow:0 0 0 3px rgba(183,201,138,.14)}
 .home-todo-editor:empty:before{content:attr(data-placeholder);color:#aaa;pointer-events:none}
+
+/* Clickable meeting checkboxes V3.17 */
+.meeting-check{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-top:1px;border:1px solid #bdbdb7;border-radius:5px;background:#fff;color:#5f7446;font-size:11px;font-weight:800;cursor:pointer}
+.meeting-check:hover{border-color:#93aa6c;background:#f7faef}
+.meeting-check.checked{border-color:#9eb677;background:#eaf2dc}
+.meeting-bullet{display:inline-block;width:18px;text-align:center}
+.meeting-item.checked-item .meeting-item-body>span{color:#999;text-decoration:line-through;text-decoration-thickness:1px}
+
+/* Member remote-work weekday selector V3.19 */
+.remote-days-wrap{margin:10px 0 8px;padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.58);border:1px solid rgba(0,0,0,.05)}
+.remote-days-wrap>span{display:block;margin-bottom:7px;color:#777;font-size:10px;font-weight:700}
+.remote-day-list{display:flex;gap:5px;flex-wrap:wrap}
+.remote-day-btn{width:27px;height:27px;padding:0;border:1px solid #deded9;border-radius:7px;background:#fff;color:#777;font-size:10px;font-weight:700;cursor:pointer}
+.remote-day-btn:hover{border-color:var(--member-line);color:var(--member-line)}
+.remote-day-btn.active{border-color:var(--member-line);background:var(--member-bg);color:var(--member-line);box-shadow:inset 0 0 0 1px var(--member-line)}
