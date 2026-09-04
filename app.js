@@ -25,6 +25,7 @@ function seed(){
   return {
     memberStatus:Object.fromEntries(members.map((m,i)=>[m,i===3?'연차':(i===1||i===5?'재택중':'근무중')])),
     memberRemoteDays:Object.fromEntries(members.map(m=>[m,[]])),
+    adTargets:Object.fromEntries(channels.map(ch=>[ch,null])),
     calendarEvents:[],
     resourceMemos:[],
     todos:[
@@ -74,10 +75,12 @@ function seed(){
 function load(){
   const saved=JSON.parse(localStorage.getItem('teamDashDataV3')||'null');
   if(saved){
-    saved.ideas=Array.isArray(saved.ideas)?saved.ideas.map(x=>({...x,archived:Boolean(x.archived)})):[];
+    saved.ideas=Array.isArray(saved.ideas)?saved.ideas.map(x=>({...x,archived:Boolean(x.archived),comments:Array.isArray(x.comments)?x.comments:[]})):[];
     saved.homeTodos=Array.isArray(saved.homeTodos)?saved.homeTodos:[];
     saved.memberRemoteDays=saved.memberRemoteDays&&typeof saved.memberRemoteDays==='object'?saved.memberRemoteDays:{};
     members.forEach(m=>{if(!Array.isArray(saved.memberRemoteDays[m]))saved.memberRemoteDays[m]=[];});
+    saved.adTargets=saved.adTargets&&typeof saved.adTargets==='object'?saved.adTargets:{};
+    channels.forEach(ch=>{if(saved.adTargets[ch]===undefined)saved.adTargets[ch]=null;});
     saved.calendarEvents=Array.isArray(saved.calendarEvents)?saved.calendarEvents:[];
     saved.resourceMemos=Array.isArray(saved.resourceMemos)?saved.resourceMemos:[];
     // V3.20에서 캘린더로 직접 작성했던 일정만 1회 호환해서 불러옴.
@@ -330,10 +333,50 @@ function renderShoots(){
 }
 window.showMoreShoots=ch=>{shootVisibleCounts[ch]=(shootVisibleCounts[ch]||10)+10;renderShoots();};
 
+function formatAdMoney(v){
+  const n=Number(v||0);
+  if(n>=100000000)return `${(n/100000000).toFixed(n%100000000===0?0:1)}억원`;
+  return `${Math.round(n/10000).toLocaleString()}만원`;
+}
 function renderAds(){
   $('#adColumns').innerHTML=channels.map(ch=>{const arr=state.ads.filter(x=>x.channel===ch);return `<section class="channel-col ad-col"><h3>${channelPill(ch)}</h3><div>${arr.length?arr.map(x=>`<article class="ad-row ${channelClass[ch]}" onclick="editItem('ads','${x.id}')"><div><span class="ad-type">${esc(x.adType||'BDC')}</span><b>${esc(x.brand)}</b><small>${esc(x.month||currentYM())}</small></div>${statusBadge(x.status)}</article>`).join(''):'<div class="empty">등록된 광고가 없어요.</div>'}</div></section>`}).join('');
-  $('#adKpi').innerHTML=channels.map(ch=>{const arr=state.ads.filter(x=>x.channel===ch),amt=arr.reduce((s,x)=>s+Number(x.amount||0),0);return `<div class="kpi ${channelClass[ch]}">${channelPill(ch)} <b>KPI</b><div><span>진행 건수<strong>${arr.length}건</strong></span><span>진행 금액<strong>${amt>=100000000?(amt/100000000).toFixed(1)+'억원':Math.round(amt/10000).toLocaleString()+'만원'}</strong></span></div></div>`}).join('');
+  state.adTargets=state.adTargets||{};
+  $('#adKpi').innerHTML=channels.map(ch=>{
+    const arr=state.ads.filter(x=>x.channel===ch),amt=arr.reduce((s,x)=>s+Number(x.amount||0),0);
+    const target=Number(state.adTargets[ch]||0);
+    const rate=target>0?(amt/target*100):null;
+    return `<div class="kpi ${channelClass[ch]}">
+      ${channelPill(ch)} <b>KPI</b>
+      <div class="ad-kpi-grid">
+        <span>진행 건수<strong>${arr.length}건</strong></span>
+        <span>진행 금액<strong>${formatAdMoney(amt)}</strong></span>
+        <span class="ad-target-cell" onclick="setAdTarget('${ch}')">목표 금액<strong>${target>0?formatAdMoney(target):'아직 설정 안됨'}</strong><small>클릭해서 설정</small></span>
+        <span>달성률<strong>${rate===null?'—':`${rate.toFixed(1)}%`}</strong>${rate!==null?`<small>${rate>=100?'목표 달성':'진행 중'}</small>`:''}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
+window.setAdTarget=ch=>{
+  state.adTargets=state.adTargets||{};
+  const current=Number(state.adTargets[ch]||0);
+  $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal ad-target-modal">
+    <div class="modal-head"><div><small>${esc(ch)} 광고 KPI</small><h3>목표 금액 설정</h3></div><button class="icon-btn" id="closeModal">×</button></div>
+    <form id="adTargetForm">
+      <label class="ad-target-input-label">목표 금액
+        <div class="ad-target-input-wrap"><input type="number" name="target" min="0" step="10000" value="${current||''}" placeholder="0"><span>원</span></div>
+      </label>
+      <p class="ad-target-guide">진행 금액을 기준으로 달성률이 자동 계산돼요.</p>
+      <div class="modal-actions"><span></span><span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div>
+    </form>
+  </div></div>`;
+  $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
+  $('#adTargetForm').onsubmit=e=>{
+    e.preventDefault();
+    const value=Number(new FormData(e.target).get('target')||0);
+    state.adTargets[ch]=value>0?value:null;save();closeModal();
+  };
+};
+
 
 function meetingMonthData(year,month){return state.meetings.filter(x=>{if(!x.date)return false;const d=new Date(x.date+'T00:00:00');return d.getFullYear()===year&&d.getMonth()+1===month;});}
 function normalizeMeetingSections(meeting){
@@ -480,12 +523,100 @@ function renderIdeas(){
       <div class="idea-card-actions">
         <button type="button" class="idea-archive-btn" onclick="event.stopPropagation();toggleIdeaArchive('${x.id}')">${x.archived?'↩ 다시 꺼내기':'보관'}</button>
       </div>
-      <div class="idea-card-bottom"><span>✦ ${x.archived?'ARCHIVE':'IDEA'}</span><button type="button" onclick="event.stopPropagation();deleteById('ideas','${x.id}')">삭제</button></div>
+      <div class="idea-card-bottom"><span>✦ ${x.archived?'ARCHIVE':'IDEA'} <em class="idea-comment-count">💬 ${(x.comments||[]).length}</em></span><button type="button" onclick="event.stopPropagation();deleteById('ideas','${x.id}')">삭제</button></div>
     </article>`;
   }).join(''):`<div class="idea-empty"><strong>${ideaView==='archive'?'보관된 아이디어가 없어요.':'아직 저장된 아이디어가 없어요.'}</strong><p>${ideaView==='archive'?'아이디어 카드에서 보관을 누르면 이곳으로 이동해요.':'떠오르는 순간 바로 기록해보세요.'}</p>${ideaView==='active'?"<button class=\"accent-btn\" onclick=\"openModal('ideaModal')\">+ 첫 아이디어 작성</button>":''}</div>`;
 }
 window.toggleIdeaArchive=id=>{const item=state.ideas.find(x=>x.id===id);if(!item)return;item.archived=!item.archived;save();};
 window.setIdeaView=view=>{ideaView=view;renderIdeas();};
+
+
+function openIdeaModal(id=null,preset={}){
+  state.ideas=Array.isArray(state.ideas)?state.ideas:[];
+  const existing=id?state.ideas.find(x=>x.id===id):null;
+  const vals={title:'',content:'',proposer:members[0],archived:false,comments:[],...existing,...preset};
+  vals.comments=Array.isArray(vals.comments)?vals.comments:[];
+
+  const commentRows=vals.comments.length?vals.comments.map(c=>ideaCommentHTML(c,id)).join(''):'<div class="idea-comment-empty">아직 댓글이 없어요.</div>';
+
+  $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal idea-detail-modal">
+    <div class="modal-head"><div><small>${existing?'아이디어 수정':'아이디어 작성'}</small><h3>${existing?esc(vals.title||'아이디어'):'새 아이디어'}</h3></div><button class="icon-btn" id="closeModal">×</button></div>
+    <form id="ideaDetailForm">
+      <div class="idea-detail-form">
+        <label>아이디어 제목<input name="title" value="${esc(vals.title||'')}" required></label>
+        <label>내용<textarea name="content" required>${esc(vals.content||'')}</textarea></label>
+        <label>제안자<select name="proposer">${members.map(m=>`<option value="${m}" ${m===vals.proposer?'selected':''}>${m}</option>`).join('')}</select></label>
+      </div>
+      <div class="modal-actions">${existing?'<button type="button" class="danger-btn" id="deleteIdea">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div>
+    </form>
+
+    ${existing?`<section class="idea-comments-section">
+      <div class="idea-comments-head"><h4>댓글 <span>${vals.comments.length}</span></h4></div>
+      <div id="ideaCommentsList" class="idea-comments-list">${commentRows}</div>
+      <div class="idea-comment-compose">
+        <select id="ideaCommentAuthor">${members.map(m=>`<option value="${m}">${m}</option>`).join('')}</select>
+        <input id="ideaCommentInput" placeholder="댓글을 입력하세요">
+        <button type="button" onclick="addIdeaComment('${existing.id}')">등록</button>
+      </div>
+    </section>`:'<p class="idea-comment-save-hint">아이디어를 먼저 저장하면 댓글을 달 수 있어요.</p>'}
+  </div></div>`;
+
+  $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
+  if(existing)$('#deleteIdea').onclick=()=>{deleteById('ideas',existing.id);closeModal();};
+  $('#ideaDetailForm').onsubmit=e=>{
+    e.preventDefault();
+    const fd=new FormData(e.target);
+    const obj={title:String(fd.get('title')||'').trim(),content:String(fd.get('content')||'').trim(),proposer:String(fd.get('proposer')||members[0])};
+    if(existing){
+      Object.assign(existing,obj);
+      save();
+      openIdeaModal(existing.id);
+    }else{
+      const created={id:uid(),...obj,createdAt:localDate(),archived:false,comments:[]};
+      state.ideas.push(created);save();openIdeaModal(created.id);
+    }
+  };
+}
+function ideaCommentHTML(c,ideaId){
+  const col=memberColors[c.author]||{bg:'#f4f4f2',line:'#999'};
+  return `<div class="idea-comment-row" data-comment-id="${c.id}">
+    <div class="idea-comment-avatar" style="background:${col.line}">${esc((c.author||'?')[0])}</div>
+    <div class="idea-comment-main">
+      <div class="idea-comment-meta"><b>${esc(c.author||'미정')}</b><small>${esc(c.createdAt||'')}</small></div>
+      <p>${esc(c.text||'').replace(/\n/g,'<br>')}</p>
+    </div>
+    <div class="idea-comment-actions"><button onclick="editIdeaComment('${ideaId}','${c.id}')">수정</button><button onclick="deleteIdeaComment('${ideaId}','${c.id}')">삭제</button></div>
+  </div>`;
+}
+window.addIdeaComment=ideaId=>{
+  const idea=state.ideas.find(x=>x.id===ideaId);if(!idea)return;
+  idea.comments=Array.isArray(idea.comments)?idea.comments:[];
+  const author=$('#ideaCommentAuthor')?.value||members[0],text=$('#ideaCommentInput')?.value.trim()||'';
+  if(!text){$('#ideaCommentInput')?.focus();return;}
+  idea.comments.push({id:uid(),author,text,createdAt:new Date().toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})});
+  save();openIdeaModal(ideaId);
+};
+window.editIdeaComment=(ideaId,commentId)=>{
+  const idea=state.ideas.find(x=>x.id===ideaId);const c=idea?.comments?.find(x=>x.id===commentId);if(!c)return;
+  const row=document.querySelector(`.idea-comment-row[data-comment-id="${commentId}"]`);
+  if(!row)return;
+  row.innerHTML=`<div class="idea-comment-edit">
+    <select id="editIdeaCommentAuthor">${members.map(m=>`<option value="${m}" ${m===c.author?'selected':''}>${m}</option>`).join('')}</select>
+    <input id="editIdeaCommentText" value="${esc(c.text||'')}">
+    <button onclick="saveIdeaComment('${ideaId}','${commentId}')">저장</button>
+    <button onclick="openIdeaModal('${ideaId}')">취소</button>
+  </div>`;
+};
+window.saveIdeaComment=(ideaId,commentId)=>{
+  const idea=state.ideas.find(x=>x.id===ideaId);const c=idea?.comments?.find(x=>x.id===commentId);if(!c)return;
+  const text=$('#editIdeaCommentText')?.value.trim()||'';if(!text)return;
+  c.author=$('#editIdeaCommentAuthor')?.value||c.author;c.text=text;save();openIdeaModal(ideaId);
+};
+window.deleteIdeaComment=(ideaId,commentId)=>{
+  const idea=state.ideas.find(x=>x.id===ideaId);if(!idea)return;
+  idea.comments=(idea.comments||[]).filter(x=>x.id!==commentId);save();openIdeaModal(ideaId);
+};
+window.openIdeaModal=openIdeaModal;
 
 function normalizeResource(x){
   const oldCat=String(x.category||'');
@@ -893,7 +1024,7 @@ const modalDefs={
 };
 $$('[data-open]').forEach(b=>b.addEventListener('click',()=>openModal(b.dataset.open)));
 function openModal(name,id=null,preset={}){
-  if(name==='uploadModal'){openUploadModal(id);return;}if(name==='shootModal'){openShootModal(id);return;}if(name==='resourceModal'){openResourceModal(id);return;}
+  if(name==='uploadModal'){openUploadModal(id);return;}if(name==='shootModal'){openShootModal(id);return;}if(name==='resourceModal'){openResourceModal(id);return;}if(name==='ideaModal'){openIdeaModal(id,preset);return;}
   const d=modalDefs[name], existing=id?state[d.key].find(x=>x.id===id):null,values={...existing,...preset};
   const fields=d.fields.map(([n,l,t,opts])=>{const val=values[n]??'';let input=t==='select'?`<select name="${n}">${opts.map(o=>`<option value="${esc(o)}" ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select>`:t==='textarea'?`<textarea name="${n}">${esc(val)}</textarea>`:`<input name="${n}" type="${t}" value="${esc(val)}" />`;return `<label class="${t==='textarea'?'full':''}">${l}${input}</label>`;}).join('');
   const modalTitle=(name==='todoModal'&&existing)?'업무 수정':d.title;
