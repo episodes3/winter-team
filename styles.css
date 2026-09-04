@@ -941,3 +941,80 @@
 .cal-cell.outside .cal-holiday-name{
   color:#c7a5a5 !important;
 }
+
+/* V3.56 notice board table */
+.notice-table{
+  width:100%;
+  overflow:hidden;
+  border:1px solid #e7e7e3;
+  border-radius:12px;
+  background:#fff;
+}
+.notice-table-head,
+.notice-table-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 130px 110px;
+  align-items:center;
+  column-gap:18px;
+}
+.notice-table-head{
+  min-height:38px;
+  padding:0 16px;
+  border-bottom:1px solid #e9e9e5;
+  background:#f7f7f4;
+  color:#92928c;
+  font-size:9px;
+  font-weight:800;
+}
+.notice-table-row{
+  min-height:48px;
+  padding:0 16px;
+  border-bottom:1px solid #efefec;
+  color:#555;
+  cursor:pointer;
+  transition:background .14s ease;
+}
+.notice-table-row:last-child{border-bottom:0}
+.notice-table-row:hover{background:#fafaf8}
+.notice-table-row.pinned{background:#fffdf7}
+.notice-table-row.pinned:hover{background:#fffaf0}
+.notice-table-title{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+.notice-table-title strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#333;
+  font-size:11px;
+  font-weight:750;
+}
+.notice-table-pin{
+  flex:0 0 auto;
+  font-size:10px;
+}
+.notice-table-date,
+.notice-table-author{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#8b8b85;
+  font-size:10px;
+}
+@media(max-width:700px){
+  .notice-table-head,
+  .notice-table-row{
+    grid-template-columns:minmax(0,1fr) 95px 72px;
+    column-gap:10px;
+    padding-left:12px;
+    padding-right:12px;
+  }
+  .notice-table-head{font-size:8px}
+  .notice-table-title strong,
+  .notice-table-date,
+  .notice-table-author{font-size:9px}
+}

@@ -1057,15 +1057,23 @@ function renderNotices(){
     board.innerHTML=`<div class="notice-empty">아직 공지가 없어요</div>`;
     return;
   }
-  board.innerHTML=list.map(x=>`<article class="notice-row notice-title-only ${x.pinned?'pinned':''}" onclick="openNoticeDetail('${x.id}')">
-    <div class="notice-pin">${x.pinned?'📌':''}</div>
-    <div class="notice-main">
-      <div class="notice-title-line">
-        <strong>${esc(x.title||'제목 없음')}</strong>
-        ${x.pinned?'<span>상단 고정</span>':''}
-      </div>
+  board.innerHTML=`<div class="notice-table">
+    <div class="notice-table-head">
+      <div>제목</div>
+      <div>업로드 날짜</div>
+      <div>작성자</div>
     </div>
-  </article>`).join('');
+    <div class="notice-table-body">
+      ${list.map(x=>`<div class="notice-table-row ${x.pinned?'pinned':''}" onclick="openNoticeDetail('${x.id}')">
+        <div class="notice-table-title">
+          ${x.pinned?'<span class="notice-table-pin">📌</span>':''}
+          <strong>${esc(x.title||'제목 없음')}</strong>
+        </div>
+        <div class="notice-table-date">${esc(x.createdAt||x.date||'-')}</div>
+        <div class="notice-table-author">${esc(x.author||'-')}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
 }
 window.setNoticeView=view=>{noticeView=view;renderNotices();};
 function openNoticeDetail(id){
