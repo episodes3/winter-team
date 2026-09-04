@@ -73,32 +73,32 @@
       </section>
 
       <section id="calendar" class="page">
-        <div class="calendar-page-head">
-          <div class="calendar-title-row">
+        <div class="calendar-head">
+          <div class="calendar-head-left">
             <h1>캘린더</h1>
-            <button class="calendar-nav-btn" onclick="moveCalendarMonth(-1)">‹</button>
+            <button class="cal-arrow" onclick="moveCalendarMonth(-1)">‹</button>
             <strong id="calendarMonthLabel"></strong>
-            <button class="calendar-nav-btn" onclick="moveCalendarMonth(1)">›</button>
-            <button class="calendar-today-btn" onclick="goCalendarToday()">오늘</button>
+            <button class="cal-arrow" onclick="moveCalendarMonth(1)">›</button>
+            <button class="cal-today" onclick="goCalendarToday()">오늘</button>
           </div>
-          <button class="calendar-add-btn" onclick="openCalendarEventModal()">일정 추가</button>
+          <button class="cal-add" onclick="openCalendarEventModal()">일정 추가</button>
         </div>
 
-        <div class="calendar-legend">
-          <span><i class="legend-dot upload"></i>업로드(자동)</span>
-          <span><i class="legend-dot shoot"></i>촬영(자동)</span>
-          <span><i class="legend-dot meeting"></i>회의</span>
-          <span><i class="legend-dot leave"></i>연차</span>
-          <span><i class="legend-dot manual"></i>기타 일정</span>
+        <div class="cal-legend">
+          <span><i class="cal-dot upload"></i>업로드 · 자동</span>
+          <span><i class="cal-dot shoot"></i>촬영 · 자동</span>
+          <span><i class="cal-dot meeting"></i>회의</span>
+          <span><i class="cal-dot leave"></i>연차</span>
+          <span><i class="cal-dot manual"></i>기타</span>
         </div>
 
-        <div class="calendar-shell">
-          <div class="calendar-weekdays">
+        <div class="cal-wrap">
+          <div class="cal-week-head">
             <div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div>
           </div>
-          <div id="calendarGrid" class="calendar-grid"></div>
+          <div id="calendarGrid" class="cal-grid"></div>
         </div>
-        <p class="calendar-help">빈 날짜를 클릭하면 일정을 추가하고, 등록된 일정을 클릭하면 수정할 수 있어요. 업로드·촬영 일정은 기존 탭과 자동 연동돼요.</p>
+        <div class="cal-guide">날짜를 누르면 그 날짜에 일정을 바로 추가할 수 있어요. 업로드와 촬영은 기존 탭의 날짜가 자동 반영됩니다.</div>
       </section>
 
       <section id="ideas" class="page">
@@ -144,8 +144,19 @@
       </section>
 
       <section id="resources" class="page">
-        <div class="page-head"><div><h1>리소스 허브</h1><p>자주 쓰는 채널, 문서, 드라이브 링크.</p></div><button class="accent-btn" data-open="resourceModal">+ 링크 추가</button></div>
-        <div id="resourceGrid" class="tile-grid"></div>
+        <div class="page-head resource-page-head">
+          <div><h1>리소스 허브</h1><p>자주 쓰는 계정, 툴, 자료를 한 곳에서 관리해요.</p></div>
+          <button class="resource-add-btn" onclick="openResourceModal()">링크 추가</button>
+        </div>
+        <div id="resourceTables" class="resource-tables"></div>
+
+        <section class="resource-memo-section">
+          <div class="resource-memo-head">
+            <h3>메모 & 텍스트</h3>
+            <button class="resource-add-btn" onclick="openResourceMemoModal()">추가</button>
+          </div>
+          <div id="resourceMemoList" class="resource-memo-list"></div>
+        </section>
       </section>
 
       <section id="notices" class="page">

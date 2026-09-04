@@ -25,6 +25,8 @@ function seed(){
   return {
     memberStatus:Object.fromEntries(members.map((m,i)=>[m,i===3?'연차':(i===1||i===5?'재택중':'근무중')])),
     memberRemoteDays:Object.fromEntries(members.map(m=>[m,[]])),
+    calendarEvents:[],
+    resourceMemos:[],
     todos:[
       {id:uid(),title:'촬영 준비 리스트 확인',assignee:'윈터',channel:'주우재',status:'촬영예정',due:''},
       {id:uid(),title:'업로드 스케줄 정리',assignee:'파타',channel:'이혜영',status:'기획',due:''},
@@ -76,6 +78,16 @@ function load(){
     saved.homeTodos=Array.isArray(saved.homeTodos)?saved.homeTodos:[];
     saved.memberRemoteDays=saved.memberRemoteDays&&typeof saved.memberRemoteDays==='object'?saved.memberRemoteDays:{};
     members.forEach(m=>{if(!Array.isArray(saved.memberRemoteDays[m]))saved.memberRemoteDays[m]=[];});
+    saved.calendarEvents=Array.isArray(saved.calendarEvents)?saved.calendarEvents:[];
+    saved.resourceMemos=Array.isArray(saved.resourceMemos)?saved.resourceMemos:[];
+    // V3.20에서 캘린더로 직접 작성했던 일정만 1회 호환해서 불러옴.
+    if(Array.isArray(saved.schedules)){
+      saved.schedules.filter(x=>x&&(x.isLeave||['manual','meeting','leave'].includes(x.type))).forEach(x=>{
+        if(!saved.calendarEvents.some(c=>c.id===x.id)){
+          saved.calendarEvents.push({...x});
+        }
+      });
+    }
     return saved;
   }
   const old=JSON.parse(localStorage.getItem('teamDashDataV2')||'null'); const base=seed();
@@ -475,7 +487,205 @@ function renderIdeas(){
 window.toggleIdeaArchive=id=>{const item=state.ideas.find(x=>x.id===id);if(!item)return;item.archived=!item.archived;save();};
 window.setIdeaView=view=>{ideaView=view;renderIdeas();};
 
-function renderResources(){$('#resourceGrid').innerHTML=state.resources.length?state.resources.map(x=>`<article class="tile"><div class="topline"><span class="status">${esc(x.category||'링크')}</span><button class="del" onclick="deleteById('resources','${x.id}')">삭제</button></div><h4><a href="${esc(x.url)}" target="_blank">${esc(x.name)} ↗</a></h4><p>${esc(x.url)}</p></article>`).join(''):'<div class="empty">등록된 리소스가 없어요.</div>';}
+function normalizeResource(x){
+  const oldCat=String(x.category||'');
+  let category=['채널 계정','툴 & 링크','참고 자료'].includes(oldCat)?oldCat:'';
+  if(!category){
+    if(oldCat==='YouTube')category='채널 계정';
+    else if(['레퍼런스'].includes(oldCat))category='참고 자료';
+    else category='툴 & 링크';
+  }
+  let channel=x.channel||'공통';
+  if(!['주우재','이혜영','도운','공통'].includes(channel))channel='공통';
+  const hay=`${x.name||''} ${x.url||''}`.toLowerCase();
+  if(!x.channel){
+    if(hay.includes('todaysjoowoojae')||hay.includes('주우재'))channel='주우재';
+    else if(hay.includes('cantstop_haeyoung')||hay.includes('이혜영')||hay.includes('혜영'))channel='이혜영';
+    else if(hay.includes('@ydwdy')||hay.includes('도운'))channel='도운';
+  }
+  return {...x,category,channel};
+}
+function resourceChannelClass(ch){
+  return ch==='주우재'?'joo':ch==='이혜영'?'hye':ch==='도운'?'dow':'common';
+}
+function renderResources(){
+  const wrap=$('#resourceTables');if(!wrap)return;
+  const list=(state.resources||[]).map(normalizeResource);
+  const cats=['채널 계정','툴 & 링크','참고 자료'];
+  wrap.innerHTML=cats.map(cat=>{
+    const rows=list.filter(x=>x.category===cat);
+    return `<section class="resource-section">
+      <div class="resource-section-head"><h3>${cat}</h3><span>${rows.length}</span></div>
+      <div class="resource-table">
+        <div class="resource-tr resource-th"><div>이름</div><div>채널</div><div>링크</div><div>관리</div></div>
+        ${rows.length?rows.map(x=>`<div class="resource-tr">
+          <div class="resource-name"><a href="${esc(x.url||'#')}" target="_blank" rel="noopener">${esc(x.name||'이름 없음')}</a></div>
+          <div><span class="resource-channel ${resourceChannelClass(x.channel)}">${esc(x.channel)}</span></div>
+          <div class="resource-url"><a href="${esc(x.url||'#')}" target="_blank" rel="noopener">${esc(x.url||'')}</a></div>
+          <div class="resource-actions"><button onclick="openResourceModal('${x.id}')">수정</button><button class="delete" onclick="deleteById('resources','${x.id}')">삭제</button></div>
+        </div>`).join(''):`<div class="resource-empty">등록된 항목이 없어요.</div>`}
+      </div>
+    </section>`;
+  }).join('');
+}
+function openResourceModal(id=null){
+  const existing=id?(state.resources||[]).find(x=>x.id===id):null;
+  const vals=existing?normalizeResource(existing):{name:'',url:'',category:'채널 계정',channel:'공통'};
+  $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal resource-modal">
+    <div class="modal-head"><div><small>${existing?'링크 수정':'리소스 허브'}</small><h3>${existing?'링크 수정':'링크 추가'}</h3></div><button class="icon-btn" id="closeModal">×</button></div>
+    <form id="resourceForm">
+      <div class="resource-form">
+        <label>이름<input name="name" value="${esc(vals.name||'')}" placeholder="예: 팀 노션" required></label>
+        <label>URL<input name="url" type="url" value="${esc(vals.url||'')}" placeholder="https://..." required></label>
+        <label>카테고리<select name="category">
+          ${['채널 계정','툴 & 링크','참고 자료'].map(v=>`<option value="${v}" ${vals.category===v?'selected':''}>${v}</option>`).join('')}
+        </select></label>
+        <label>채널<select name="channel">
+          ${['주우재','이혜영','도운','공통'].map(v=>`<option value="${v}" ${vals.channel===v?'selected':''}>${v}</option>`).join('')}
+        </select></label>
+      </div>
+      <div class="modal-actions">${existing?'<button type="button" class="danger-btn" id="deleteResource">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button type="submit" class="resource-save-btn">저장</button></div>
+    </form>
+  </div></div>`;
+  $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
+  if(existing)$('#deleteResource').onclick=()=>{deleteById('resources',existing.id);closeModal();};
+  $('#resourceForm').onsubmit=e=>{
+    e.preventDefault();
+    const fd=new FormData(e.target);
+    const obj={
+      name:String(fd.get('name')||'').trim(),
+      url:String(fd.get('url')||'').trim(),
+      category:String(fd.get('category')||'채널 계정'),
+      channel:String(fd.get('channel')||'공통')
+    };
+    if(existing)Object.assign(existing,obj);else state.resources.push({id:uid(),...obj});
+    save();closeModal();
+  };
+}
+
+window.openResourceModal=openResourceModal;
+
+function sanitizeResourceMemoHtml(html){
+  const box=document.createElement('div');
+  box.innerHTML=String(html||'');
+  const allowed=['strong','b','em','i','u','br','div','p','ul','ol','li','span'];
+  const walk=node=>{
+    [...node.childNodes].forEach(ch=>{
+      if(ch.nodeType===3)return;
+      if(ch.nodeType!==1){ch.remove();return;}
+      const tag=ch.tagName.toLowerCase();
+      if(!allowed.includes(tag)){
+        const frag=document.createDocumentFragment();
+        while(ch.firstChild)frag.appendChild(ch.firstChild);
+        ch.replaceWith(frag);
+        return;
+      }
+      [...ch.attributes].forEach(a=>{
+        if(!(tag==='span'&&a.name==='data-size'))ch.removeAttribute(a.name);
+      });
+      if(tag==='span'&&ch.dataset.size){
+        const size=['small','normal','large'].includes(ch.dataset.size)?ch.dataset.size:'normal';
+        ch.dataset.size=size;
+      }
+      walk(ch);
+    });
+  };
+  walk(box);
+  return box.innerHTML;
+}
+function resourceMemoText(html){
+  const box=document.createElement('div');box.innerHTML=String(html||'');
+  return (box.innerText||box.textContent||'').trim();
+}
+function renderResourceMemos(){
+  const wrap=$('#resourceMemoList');if(!wrap)return;
+  state.resourceMemos=Array.isArray(state.resourceMemos)?state.resourceMemos:[];
+  wrap.innerHTML=state.resourceMemos.length?state.resourceMemos.map(x=>`<article class="resource-memo-card">
+    <div class="resource-memo-card-main" onclick="openResourceMemoModal('${x.id}')">
+      <h4>${esc(x.title||'제목 없음')}</h4>
+      <div class="resource-memo-preview">${sanitizeResourceMemoHtml(x.html||esc(x.text||''))}</div>
+    </div>
+    <div class="resource-memo-actions">
+      <button onclick="openResourceMemoModal('${x.id}')">✎ 수정</button>
+      <button class="delete" onclick="deleteResourceMemo('${x.id}')">삭제</button>
+    </div>
+  </article>`).join(''):`<div class="resource-memo-empty">등록된 메모가 없어요.</div>`;
+}
+window.deleteResourceMemo=id=>{state.resourceMemos=state.resourceMemos.filter(x=>x.id!==id);save();};
+
+function applyResourceMemoFormat(cmd,value=null){
+  const editor=$('#resourceMemoEditor');if(!editor)return;
+  editor.focus();
+
+  if(cmd==='bold'||cmd==='italic'||cmd==='underline'||cmd==='insertUnorderedList'){
+    document.execCommand(cmd,false,null);
+    return;
+  }
+  if(cmd==='size'){
+    const sel=window.getSelection();
+    if(!sel||!sel.rangeCount)return;
+    if(sel.isCollapsed)return;
+    const range=sel.getRangeAt(0);
+    const span=document.createElement('span');
+    span.dataset.size=value||'normal';
+    try{
+      range.surroundContents(span);
+    }catch{
+      const frag=range.extractContents();span.appendChild(frag);range.insertNode(span);
+    }
+    sel.removeAllRanges();
+    const r=document.createRange();r.selectNodeContents(span);sel.addRange(r);
+  }
+}
+window.applyResourceMemoFormat=applyResourceMemoFormat;
+
+function openResourceMemoModal(id=null){
+  state.resourceMemos=Array.isArray(state.resourceMemos)?state.resourceMemos:[];
+  const existing=id?state.resourceMemos.find(x=>x.id===id):null;
+  const vals=existing||{title:'',html:'',text:''};
+
+  $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal resource-memo-modal">
+    <div class="modal-head"><h3>${existing?'메모 수정':'메모 추가'}</h3><button class="icon-btn" id="closeModal">×</button></div>
+    <form id="resourceMemoForm">
+      <div class="resource-memo-form">
+        <label>제목<input name="title" value="${esc(vals.title||'')}" placeholder="예: 파일 네이밍 규칙" required></label>
+        <label>내용
+          <div class="resource-rich-editor">
+            <div class="resource-rich-toolbar">
+              <button type="button" onmousedown="event.preventDefault();applyResourceMemoFormat('bold')"><b>B</b></button>
+              <button type="button" onmousedown="event.preventDefault();applyResourceMemoFormat('italic')"><i>I</i></button>
+              <button type="button" onmousedown="event.preventDefault();applyResourceMemoFormat('underline')"><u>U</u></button>
+              <span class="toolbar-sep"></span>
+              <button type="button" onmousedown="event.preventDefault();applyResourceMemoFormat('size','small')">작게</button>
+              <button type="button" onmousedown="event.preventDefault();applyResourceMemoFormat('size','normal')">보통</button>
+              <button type="button" onmousedown="event.preventDefault();applyResourceMemoFormat('size','large')">크게</button>
+              <span class="toolbar-sep"></span>
+              <button type="button" onmousedown="event.preventDefault();applyResourceMemoFormat('insertUnorderedList')">• 목록</button>
+            </div>
+            <div id="resourceMemoEditor" class="resource-memo-editor" contenteditable="true" data-placeholder="내용을 입력하세요">${sanitizeResourceMemoHtml(vals.html||esc(vals.text||''))}</div>
+          </div>
+        </label>
+      </div>
+      <div class="modal-actions">${existing?'<button type="button" class="danger-btn" id="deleteResourceMemoModal">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button type="submit" class="resource-save-btn">저장</button></div>
+    </form>
+  </div></div>`;
+
+  $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
+  if(existing)$('#deleteResourceMemoModal').onclick=()=>{deleteResourceMemo(existing.id);closeModal();};
+  $('#resourceMemoForm').onsubmit=e=>{
+    e.preventDefault();
+    const fd=new FormData(e.target);
+    const title=String(fd.get('title')||'').trim();
+    const html=sanitizeResourceMemoHtml($('#resourceMemoEditor').innerHTML);
+    const text=resourceMemoText(html);
+    if(!title){e.target.querySelector('input[name="title"]').focus();return;}
+    if(existing)Object.assign(existing,{title,html,text});
+    else state.resourceMemos.push({id:uid(),title,html,text,createdAt:new Date().toISOString()});
+    save();closeModal();
+  };
+  setTimeout(()=>$('#resourceMemoEditor')?.focus(),0);
+}
+window.openResourceMemoModal=openResourceMemoModal;
 let noticeView='episode';
 function normalizeNotice(x){
   return {
@@ -536,106 +746,139 @@ function openNoticeModal(id=null){
 window.openNoticeModal=openNoticeModal;
 
 
-let calendarCursor=new Date();
-calendarCursor=new Date(calendarCursor.getFullYear(),calendarCursor.getMonth(),1);
+let calendarCursor=(()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),1);})();
 
-function calendarManualType(x){
-  if(x.type==='leave'||x.isLeave)return 'leave';
-  if(x.type==='meeting')return 'meeting';
-  return 'manual';
+function calendarPDNames(shoot){
+  return shootMembers(shoot).filter(m=>members.includes(m));
 }
-function calendarEvents(){
-  const manual=(state.schedules||[]).filter(x=>x.date).map(x=>({
-    id:x.id,source:'manual',date:x.date,title:x.title||'일정',type:calendarManualType(x),member:x.member||x.assignee||'',raw:x
-  }));
+function calendarAutoEvents(){
   const uploads=(state.uploads||[]).filter(x=>x.date).map(x=>({
-    id:x.id,source:'upload',date:x.date,title:x.title||'업로드',type:'upload',raw:x
+    source:'upload',type:'upload',id:x.id,date:x.date,
+    title:x.title||'업로드',channel:x.channel||''
   }));
   const shoots=[];
   (state.shoots||[]).forEach(x=>{
-    const pd=shootMembers(x);
-    const suffix=pd.length?` (${pd.join(', ')})`:'';
-    shootDates(x).forEach((d,i)=>{
-      if(d.date)shoots.push({id:x.id,source:'shoot',date:d.date,title:(x.title||'촬영')+suffix,type:'shoot',raw:x,dateIndex:i});
+    const pds=calendarPDNames(x);
+    const pdText=pds.length?` (${pds.join(', ')})`:'';
+    shootDates(x).forEach(d=>{
+      if(d.date)shoots.push({
+        source:'shoot',type:'shoot',id:x.id,date:d.date,
+        title:`${x.title||'촬영'}${pdText}`,channel:x.channel||''
+      });
     });
   });
-  return [...manual,...uploads,...shoots];
+  return [...uploads,...shoots];
+}
+function calendarManualEvents(){
+  state.calendarEvents=Array.isArray(state.calendarEvents)?state.calendarEvents:[];
+  return state.calendarEvents.filter(x=>x.date).map(x=>({
+    source:'manual',
+    type:x.type==='leave'?'leave':(x.type==='meeting'?'meeting':'manual'),
+    id:x.id,date:x.date,title:x.title||'일정',member:x.member||''
+  }));
+}
+function allCalendarEvents(){
+  return [...calendarAutoEvents(),...calendarManualEvents()];
+}
+function calendarEventButton(e){
+  let action='';
+  if(e.source==='upload') action=`openUploadModal('${e.id}')`;
+  else if(e.source==='shoot') action=`openShootModal('${e.id}')`;
+  else action=`openCalendarEventModal('${e.id}')`;
+  const icon=e.type==='upload'?'▸':e.type==='shoot'?'●':e.type==='meeting'?'◆':e.type==='leave'?'↻':'•';
+  return `<button type="button" class="cal-event ${e.type}" onclick="event.stopPropagation();${action}" title="${esc(e.title)}"><b>${icon}</b><span>${esc(e.title)}</span></button>`;
 }
 function renderCalendar(){
   const grid=$('#calendarGrid'),label=$('#calendarMonthLabel');if(!grid||!label)return;
-  const y=calendarCursor.getFullYear(),m=calendarCursor.getMonth();
-  label.textContent=`${y}년 ${m+1}월`;
-  const first=new Date(y,m,1),start=new Date(y,m,1-first.getDay());
+  const year=calendarCursor.getFullYear(),month=calendarCursor.getMonth();
+  label.textContent=`${year}년 ${month+1}월`;
+
+  const firstDay=new Date(year,month,1).getDay();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const weekCount=Math.ceil((firstDay+daysInMonth)/7);
+  const start=new Date(year,month,1-firstDay);
+  const total=weekCount*7;
   const today=localDate();
-  const events=calendarEvents();
+  const events=allCalendarEvents();
+
+  grid.style.gridTemplateRows=`repeat(${weekCount}, minmax(132px, 1fr))`;
   const cells=[];
-  for(let i=0;i<42;i++){
+  for(let i=0;i<total;i++){
     const d=new Date(start);d.setDate(start.getDate()+i);
-    const iso=localDate(d),inMonth=d.getMonth()===m,dow=d.getDay();
-    const dayEvents=events.filter(e=>e.date===iso);
-    cells.push(`<div class="calendar-cell ${inMonth?'':'outside'} ${iso===today?'today':''}" onclick="openCalendarEventModal(null,'${iso}')">
-      <div class="calendar-day-number ${dow===0?'sun':''} ${dow===6?'sat':''}">${d.getDate()}${iso===today?'<span>오늘</span>':''}</div>
-      <div class="calendar-events">${dayEvents.slice(0,5).map(e=>calendarEventHTML(e)).join('')}${dayEvents.length>5?`<button class="calendar-more" onclick="event.stopPropagation()">+${dayEvents.length-5}개 더</button>`:''}</div>
+    const iso=localDate(d),inMonth=d.getMonth()===month,dow=d.getDay();
+    const rows=events.filter(x=>x.date===iso);
+    cells.push(`<div class="cal-cell ${inMonth?'':'outside'} ${iso===today?'today':''}" onclick="openCalendarEventModal(null,'${iso}')">
+      <div class="cal-date ${dow===0?'sun':''} ${dow===6?'sat':''}"><span>${d.getDate()}</span>${iso===today?'<em>오늘</em>':''}</div>
+      <div class="cal-events">${rows.map(calendarEventButton).join('')}</div>
     </div>`);
   }
   grid.innerHTML=cells.join('');
 }
-function calendarEventHTML(e){
-  const sourceLabel=e.source==='upload'?'업로드':e.source==='shoot'?'촬영':e.type==='leave'?'연차':e.type==='meeting'?'회의':'일정';
-  const click=e.source==='upload'?`openUploadModal('${e.id}')`:e.source==='shoot'?`openShootModal('${e.id}')`:`openCalendarEventModal('${e.id}')`;
-  return `<button class="calendar-event ${e.type}" onclick="event.stopPropagation();${click}" title="${esc(e.title)}"><small>${sourceLabel}</small><span>${esc(e.title)}</span></button>`;
-}
-window.moveCalendarMonth=n=>{calendarCursor=new Date(calendarCursor.getFullYear(),calendarCursor.getMonth()+n,1);renderCalendar();};
-window.goCalendarToday=()=>{const n=new Date();calendarCursor=new Date(n.getFullYear(),n.getMonth(),1);renderCalendar();};
+window.moveCalendarMonth=delta=>{
+  calendarCursor=new Date(calendarCursor.getFullYear(),calendarCursor.getMonth()+delta,1);
+  renderCalendar();
+};
+window.goCalendarToday=()=>{
+  const d=new Date();calendarCursor=new Date(d.getFullYear(),d.getMonth(),1);renderCalendar();
+};
 
 function openCalendarEventModal(id=null,presetDate=''){
-  state.schedules=Array.isArray(state.schedules)?state.schedules:[];
-  const existing=id?state.schedules.find(x=>x.id===id):null;
+  state.calendarEvents=Array.isArray(state.calendarEvents)?state.calendarEvents:[];
+  const existing=id?state.calendarEvents.find(x=>x.id===id):null;
   const vals=existing||{title:'',date:presetDate||localDate(),type:'manual',member:'',memo:''};
-  const isLeave=vals.type==='leave'||Boolean(vals.isLeave);
-  $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal calendar-event-modal">
-    <div class="modal-head"><div><small>${existing?'일정 수정':'캘린더 일정 추가'}</small><h3>${existing?esc(vals.title||'일정'):'새 일정'}</h3></div><button class="icon-btn" id="closeModal">×</button></div>
-    <form id="calendarEventForm">
-      <div class="calendar-event-form-grid">
-        <label class="full">일정 제목<input name="title" value="${esc(vals.title||'')}" placeholder="${isLeave?'연차는 팀원 선택 시 자동 입력돼요':'일정 제목을 입력하세요'}" ${isLeave?'':'required'}></label>
+  const leave=vals.type==='leave';
+
+  $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal cal-modal">
+    <div class="modal-head"><div><small>${existing?'일정 수정':'일정 추가'}</small><h3>${existing?esc(vals.title||'일정'):'새 일정 등록'}</h3></div><button class="icon-btn" id="closeModal">×</button></div>
+    <form id="calEventForm">
+      <div class="cal-form">
+        <label class="full">일정 제목<input name="title" value="${esc(vals.title||'')}" placeholder="예: 디자인 회의"></label>
         <label>날짜<input type="date" name="date" value="${esc(vals.date||localDate())}" required></label>
-        <label>일정 종류<select name="type">
+        <label>종류<select name="type">
           <option value="manual" ${vals.type==='manual'?'selected':''}>기타 일정</option>
           <option value="meeting" ${vals.type==='meeting'?'selected':''}>회의</option>
         </select></label>
-        <div class="calendar-leave-row full">
-          <div><b>연차</b><small>연차 일정으로 등록</small></div>
-          <label class="switch"><input type="checkbox" id="calendarLeaveSwitch" ${isLeave?'checked':''}><span></span></label>
+
+        <div class="cal-leave-switch full">
+          <div><b>연차로 등록</b><small>켜면 팀원을 선택해서 연차 일정으로 저장해요.</small></div>
+          <label class="cal-switch"><input id="calLeaveSwitch" type="checkbox" ${leave?'checked':''}><span></span></label>
         </div>
-        <label class="full calendar-member-field ${isLeave?'':'hidden'}" id="calendarLeaveMemberWrap">연차 팀원<select name="member"><option value="">팀원 선택</option>${members.map(m=>`<option value="${m}" ${m===vals.member?'selected':''}>${m}</option>`).join('')}</select></label>
-        <label class="full">메모<textarea name="memo" placeholder="필요한 내용을 적어주세요">${esc(vals.memo||'')}</textarea></label>
+
+        <label id="calMemberWrap" class="full ${leave?'':'hidden'}">연차 팀원
+          <select name="member"><option value="">선택</option>${members.map(m=>`<option value="${m}" ${m===vals.member?'selected':''}>${m}</option>`).join('')}</select>
+        </label>
+        <label class="full">메모<textarea name="memo" placeholder="메모가 필요하면 적어주세요">${esc(vals.memo||'')}</textarea></label>
       </div>
-      <div class="modal-actions">${existing?'<button type="button" class="danger-btn" id="deleteCalendarEvent">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div>
+      <div class="modal-actions">${existing?'<button type="button" class="danger-btn" id="deleteCalEvent">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div>
     </form>
   </div></div>`;
+
   $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
-  const sw=$('#calendarLeaveSwitch'),wrap=$('#calendarLeaveMemberWrap'),titleInput=$('#calendarEventForm input[name="title"]');
-  sw.onchange=()=>{wrap.classList.toggle('hidden',!sw.checked);if(sw.checked)titleInput.removeAttribute('required');else titleInput.setAttribute('required','');};
-  if(existing)$('#deleteCalendarEvent').onclick=()=>{state.schedules=state.schedules.filter(x=>x.id!==existing.id);save();closeModal();};
-  $('#calendarEventForm').onsubmit=e=>{
+  const sw=$('#calLeaveSwitch'),memberWrap=$('#calMemberWrap');
+  sw.onchange=()=>memberWrap.classList.toggle('hidden',!sw.checked);
+  if(existing)$('#deleteCalEvent').onclick=()=>{
+    state.calendarEvents=state.calendarEvents.filter(x=>x.id!==existing.id);save();closeModal();
+  };
+  $('#calEventForm').onsubmit=e=>{
     e.preventDefault();
-    const fd=new FormData(e.target),leave=sw.checked,member=fd.get('member')||'';
-    if(leave&&!member){wrap.classList.remove('hidden');wrap.querySelector('select').focus();return;}
+    const fd=new FormData(e.target),isLeave=sw.checked,member=String(fd.get('member')||'');
+    const title=String(fd.get('title')||'').trim();
+    if(isLeave&&!member){memberWrap.classList.remove('hidden');memberWrap.querySelector('select').focus();return;}
+    if(!isLeave&&!title){e.target.querySelector('input[name="title"]').focus();return;}
     const obj={
-      title:leave?`${member} 연차`:String(fd.get('title')||'').trim(),
-      date:fd.get('date'),
-      type:leave?'leave':fd.get('type'),
-      member:leave?member:'',
-      memo:fd.get('memo')||'',
-      isLeave:leave
+      title:isLeave?`${member} 연차`:title,
+      date:String(fd.get('date')||''),
+      type:isLeave?'leave':String(fd.get('type')||'manual'),
+      member:isLeave?member:'',
+      memo:String(fd.get('memo')||'')
     };
-    if(existing)Object.assign(existing,obj);else state.schedules.push({id:uid(),...obj});
+    if(existing)Object.assign(existing,obj);else state.calendarEvents.push({id:uid(),...obj});
     save();closeModal();
   };
 }
 window.openCalendarEventModal=openCalendarEventModal;
 
-function renderAll(){renderHome();renderCalendar();renderUploads();renderShoots();renderAds();renderIdeas();renderMeetingsLanding();renderResources();renderNotices();}
+function renderAll(){renderHome();renderCalendar();renderUploads();renderShoots();renderAds();renderIdeas();renderMeetingsLanding();renderResources();renderResourceMemos();renderNotices();}
 window.deleteById=(key,id)=>{state[key]=state[key].filter(x=>x.id!==id);save();};
 
 const modalDefs={
@@ -645,12 +888,12 @@ const modalDefs={
   shootModal:{title:'촬영 정보',key:'shoots',fields:[['channel','채널','select',channels],['title','영상 제목','text'],['assignee','담당 PD','select',members],['date','촬영일','date'],['method','촬영 방식','select',['PD 자체 촬영','촬영팀 동행','셀프캠','기타']],['crew','촬영팀 / 참여자 (쉼표 구분)','text'],['equipment','장비','text'],['notes','준비사항 / 유의사항','textarea']]},
   adModal:{title:'광고 정보',key:'ads',fields:[['channel','채널','select',channels],['brand','브랜드','text'],['product','제품','text'],['adType','광고 유형','select',['BDC','기획PPL','단순PPL','브랜디드','기타']],['assignee','담당자','select',members],['amount','금액','number'],['month','진행 월','month'],['status','상태','select',statuses],['proposal','구성안 전달일','date'],['rough','가편 전달일','date'],['final','최종본 전달일','date'],['memo','메모','textarea']]},
   meetingModal:{title:'회의록 추가',key:'meetings',fields:[['title','회의 제목','text'],['date','날짜','date'],['week','주차','select',['1','2','3','4','5']]]},
-  resourceModal:{title:'링크 추가',key:'resources',fields:[['name','이름','text'],['url','URL','url'],['category','카테고리','select',['YouTube','Google Drive','문서','레퍼런스','기타']]]},
+  resourceModal:{title:'링크 추가',key:'resources',fields:[]},
   noticeModal:{title:'공지 작성',key:'notices',fields:[['channel','채널','select',['전체',...channels]],['title','제목','text'],['content','내용','textarea'],['author','작성자','select',members]]}
 };
 $$('[data-open]').forEach(b=>b.addEventListener('click',()=>openModal(b.dataset.open)));
 function openModal(name,id=null,preset={}){
-  if(name==='uploadModal'){openUploadModal(id);return;}if(name==='shootModal'){openShootModal(id);return;}
+  if(name==='uploadModal'){openUploadModal(id);return;}if(name==='shootModal'){openShootModal(id);return;}if(name==='resourceModal'){openResourceModal(id);return;}
   const d=modalDefs[name], existing=id?state[d.key].find(x=>x.id===id):null,values={...existing,...preset};
   const fields=d.fields.map(([n,l,t,opts])=>{const val=values[n]??'';let input=t==='select'?`<select name="${n}">${opts.map(o=>`<option value="${esc(o)}" ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select>`:t==='textarea'?`<textarea name="${n}">${esc(val)}</textarea>`:`<input name="${n}" type="${t}" value="${esc(val)}" />`;return `<label class="${t==='textarea'?'full':''}">${l}${input}</label>`;}).join('');
   const modalTitle=(name==='todoModal'&&existing)?'업무 수정':d.title;
@@ -663,7 +906,7 @@ window.editItem=(key,id)=>openModal({todos:'todoModal',uploads:'uploadModal',sho
 window.openModal=openModal;
 document.addEventListener('click',e=>{const b=e.target.closest('[data-idea-view]');if(b){window.setIdeaView(b.dataset.ideaView);}});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-notice-view]');if(b){window.setNoticeView(b.dataset.noticeView);}});
-$('#globalSearch').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();$$('.member-card,.tile,.doc,.simple-row,.upload-card,.shoot-card,.ad-row,.idea-card').forEach(el=>el.style.display=!q||el.textContent.toLowerCase().includes(q)?'':'none');});
+$('#globalSearch').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();$$('.member-card,.resource-tr,.resource-memo-card,.doc,.simple-row,.upload-card,.shoot-card,.ad-row,.idea-card').forEach(el=>el.style.display=!q||el.textContent.toLowerCase().includes(q)?'':'none');});
 $('#exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='우리팀-잘-굴러가유-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);};
 $('#todayLabel').textContent=new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date());
 renderAll();
