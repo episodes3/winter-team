@@ -361,13 +361,22 @@ function openShootModal(id=null){
 }
 window.openShootModal=openShootModal;
 
+function shootPdChip(name){
+  const c=memberColors[name]||{bg:'#f1f1ef',line:'#888'};
+  return `<span class="shoot-person-chip shoot-pd-chip" style="--chip-bg:${c.bg};--chip-color:${c.line}">${esc(name)}</span>`;
+}
+function shootCrewChips(crew){
+  const names=String(crew||'').split(',').map(v=>v.trim()).filter(Boolean);
+  if(!names.length)return '';
+  return names.map(n=>`<span class="shoot-person-chip shoot-camera-chip">${esc(n)}</span>`).join('');
+}
 function renderShoots(){
   const total=state.shoots.length,equip=state.shoots.filter(x=>x.equipment&&x.equipment!=='없음'&&x.method!=='셀프캠').length,crew=state.shoots.filter(x=>x.method==='촬영팀 동행').length,self=state.shoots.filter(x=>x.method==='셀프캠').length;
   $('#shootSummary').innerHTML=`<div class="summary-box green"><small>🎒 장비불출</small><strong>${equip}건</strong><span>/ 촬영 ${total}건 · ${total?Math.round(equip/total*100):0}%</span></div><div class="summary-box"><small>🎥 촬영팀 동행</small><strong>${crew}건</strong><span>/ ${total?Math.round(crew/total*100):0}%</span></div><div class="summary-box gray"><small>🦿 해당없음 (셀프캠)</small><strong>${self}건</strong><span>비율 제외</span></div>`;
   $('#shootColumns').innerHTML=channels.map(ch=>{
     const arr=state.shoots.filter(x=>x.channel===ch).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     const limit=shootVisibleCounts[ch]||10,shown=arr.slice(0,limit),remain=Math.max(0,arr.length-limit),next=Math.min(10,remain);
-    const cards=shown.length?shown.map(x=>`<article class="shoot-card ${channelClass[ch]}" onclick="editItem('shoots','${x.id}')"><div class="shoot-card-head"><h4>${esc(x.title)}</h4><time>${shootDates(x).map(d=>fmtDate(d.date)+(d.memo?` ${esc(d.memo)}`:'')).join(' · ')||'-'}</time></div><div class="crew-chips">${(x.members||[]).map(n=>`<span>${esc(n)}</span>`).join('')}${x.selfCam?'<span>셀프캠</span>':''}</div>${x.crew?`<small>🎥 ${esc(x.crew)}</small>`:''}<small>${esc(x.method||'촬영 방식 미정')}</small>${x.notes?`<em>${esc(x.notes)}</em>`:''}</article>`).join(''):'<div class="empty">등록된 촬영이 없어요.</div>';
+    const cards=shown.length?shown.map(x=>`<article class="shoot-card ${channelClass[ch]}" onclick="editItem('shoots','${x.id}')"><div class="shoot-card-head"><h4>${esc(x.title)}</h4><time>${shootDates(x).map(d=>fmtDate(d.date)+(d.memo?` ${esc(d.memo)}`:'')).join(' · ')||'-'}</time></div><div class="crew-chips">${shootMembers(x).map(shootPdChip).join('')}${shootCrewChips(x.crew)}${x.selfCam||x.method==='셀프캠'?'<span class="shoot-person-chip shoot-selfcam-chip">셀프캠</span>':''}</div><small>${esc(x.method||'촬영 방식 미정')}</small>${x.notes?`<em>${esc(x.notes)}</em>`:''}</article>`).join(''):'<div class="empty">등록된 촬영이 없어요.</div>';
     return `<section class="channel-col"><h3>${channelPill(ch)}</h3><p>촬영 ${arr.length}건</p><div class="shoot-list">${cards}</div>${remain?`<button class="shoot-more-btn" onclick="showMoreShoots('${ch}')">지난 촬영 ${next}건 펼치기 <span>↓</span></button>`:''}</section>`;
   }).join('');
 }
@@ -389,7 +398,7 @@ function adStatusBadge(status){
   return `<span class="ad-status-badge ad-status-${cls}">${esc(v)}</span>`;
 }
 function renderAds(){
-  $('#adColumns').innerHTML=channels.map(ch=>{const arr=state.ads.filter(x=>x.channel===ch);return `<section class="channel-col ad-col"><h3>${channelPill(ch)}</h3><div>${arr.length?arr.map(x=>`<article class="ad-row ${channelClass[ch]}" onclick="editItem('ads','${x.id}')"><div>${adTypeBadge(x.adType)}<b>${esc(x.brand)}</b><small>${esc(x.month||currentYM())}</small></div>${adStatusBadge(x.status)}</article>`).join(''):'<div class="empty">등록된 광고가 없어요.</div>'}</div></section>`}).join('');
+  $('#adColumns').innerHTML=channels.map(ch=>{const arr=state.ads.filter(x=>x.channel===ch);return `<section class="channel-col ad-col"><h3>${channelPill(ch)}</h3><div>${arr.length?arr.map(x=>`<article class="ad-row ${channelClass[ch]} ${x.status==='업로드 완료'?'ad-completed':''}" onclick="editItem('ads','${x.id}')"><div>${adTypeBadge(x.adType)}<b>${esc(x.brand)}</b><small>${esc(x.month||currentYM())}</small></div>${adStatusBadge(x.status)}</article>`).join(''):'<div class="empty">등록된 광고가 없어요.</div>'}</div></section>`}).join('');
   state.adTargets=state.adTargets||{};
   $('#adKpi').innerHTML=channels.map(ch=>{
     const arr=state.ads.filter(x=>x.channel===ch),amt=arr.reduce((s,x)=>s+Number(x.amount||0),0);

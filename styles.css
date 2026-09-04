@@ -648,3 +648,48 @@
   border-color:#cbdba7 !important;
   color:#405622 !important;
 }
+
+/* V3.38 shoot member color chips */
+.crew-chips{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:5px;
+}
+.crew-chips .shoot-person-chip{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:max-content;
+  padding:3px 7px;
+  border-radius:7px;
+  font-size:8px;
+  font-weight:800;
+  line-height:1.25;
+  white-space:nowrap;
+}
+.crew-chips .shoot-pd-chip{
+  background:var(--chip-bg) !important;
+  color:var(--chip-color) !important;
+  border:1px solid color-mix(in srgb,var(--chip-color) 28%,transparent) !important;
+}
+.crew-chips .shoot-camera-chip{
+  background:#e9eef3 !important;
+  color:#5b6977 !important;
+  border:1px solid #d7dfe6 !important;
+}
+.crew-chips .shoot-selfcam-chip{
+  background:#f4eadf !important;
+  color:#956f45 !important;
+  border:1px solid #e7d5c1 !important;
+}
+
+/* V3.39 completed ad strike-through */
+.ad-row.ad-completed{
+  opacity:.62;
+}
+.ad-row.ad-completed > div > b{
+  text-decoration:line-through;
+  text-decoration-thickness:1px;
+  text-decoration-color:currentColor;
+}
