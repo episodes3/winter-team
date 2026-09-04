@@ -179,7 +179,14 @@ function renderHomeTodos(){
   </div>`).join(''):`<div class="home-todo-empty">아직 할 일이 없어요. <button onclick="openHomeTodoModal()">+ 첫 항목 추가</button></div>`;
 }
 window.toggleHomeTodo=id=>{const x=state.homeTodos.find(v=>v.id===id);if(!x)return;x.done=!x.done;save();};
-window.deleteHomeTodo=id=>{state.homeTodos=state.homeTodos.filter(v=>v.id!==id);save();};
+window.deleteHomeTodo=id=>{
+  const index=state.homeTodos.findIndex(v=>v.id===id);if(index<0)return;
+  const removed=state.homeTodos[index];state.homeTodos.splice(index,1);save();
+  showDeleteUndo('To Do가 삭제되었습니다',()=>{
+    if(!state.homeTodos.some(v=>v.id===removed.id))state.homeTodos.splice(Math.min(index,state.homeTodos.length),0,removed);
+    save();
+  });
+};
 function homeTodoFormat(cmd){
   const editor=$('#homeTodoEditor');if(!editor)return;
   editor.focus();
@@ -583,7 +590,18 @@ window.saveMeetingPopup=(meetingId,sectionIndex,itemIndex)=>{
 };
 window.editMeetingItem=(meetingId,sectionIndex,itemIndex)=>openMeetingItemModal(meetingId,sectionIndex,itemIndex);
 window.deleteMeetingItem=(meetingId,sectionIndex,itemIndex)=>{
-  const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;normalizeMeetingSections(m);m.sections[sectionIndex].items.splice(itemIndex,1);saveMeetingAndStay(m);
+  const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;
+  normalizeMeetingSections(m);
+  const items=m.sections?.[sectionIndex]?.items;if(!items||!items[itemIndex])return;
+  const removed=items[itemIndex];
+  items.splice(itemIndex,1);saveMeetingAndStay(m);
+  showDeleteUndo('회의록 항목이 삭제되었습니다',()=>{
+    const meeting=state.meetings.find(x=>x.id===meetingId);if(!meeting)return;
+    normalizeMeetingSections(meeting);
+    const restoreItems=meeting.sections?.[sectionIndex]?.items;if(!restoreItems)return;
+    restoreItems.splice(Math.min(itemIndex,restoreItems.length),0,removed);
+    saveMeetingAndStay(meeting);
+  });
 };
 function saveMeetingAndStay(m){localStorage.setItem('teamDashDataV3',JSON.stringify(state));const d=new Date(m.date+'T00:00:00');renderMeetingMonth(d.getFullYear(),d.getMonth()+1,String(m.week||'1'));renderHome();}
 window.renderCurrentMeeting=(meetingId)=>{const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;const d=new Date(m.date+'T00:00:00');renderMeetingMonth(d.getFullYear(),d.getMonth()+1,String(m.week||'1'));};
@@ -699,7 +717,15 @@ window.saveIdeaComment=(ideaId,commentId)=>{
 };
 window.deleteIdeaComment=(ideaId,commentId)=>{
   const idea=state.ideas.find(x=>x.id===ideaId);if(!idea)return;
-  idea.comments=(idea.comments||[]).filter(x=>x.id!==commentId);save();openIdeaModal(ideaId);
+  idea.comments=Array.isArray(idea.comments)?idea.comments:[];
+  const index=idea.comments.findIndex(x=>x.id===commentId);if(index<0)return;
+  const removed=idea.comments[index];idea.comments.splice(index,1);save();openIdeaModal(ideaId);
+  showDeleteUndo('댓글이 삭제되었습니다',()=>{
+    const target=state.ideas.find(x=>x.id===ideaId);if(!target)return;
+    target.comments=Array.isArray(target.comments)?target.comments:[];
+    if(!target.comments.some(x=>x.id===removed.id))target.comments.splice(Math.min(index,target.comments.length),0,removed);
+    save();openIdeaModal(ideaId);
+  });
 };
 window.openIdeaModal=openIdeaModal;
 
@@ -838,7 +864,16 @@ window.toggleResourceMemo=id=>{
   activeResourceMemoId=activeResourceMemoId===id?null:id;
   renderResourceMemos();
 };
-window.deleteResourceMemo=id=>{state.resourceMemos=state.resourceMemos.filter(x=>x.id!==id);if(activeResourceMemoId===id)activeResourceMemoId=null;save();};
+window.deleteResourceMemo=id=>{
+  const index=state.resourceMemos.findIndex(x=>x.id===id);if(index<0)return;
+  const removed=state.resourceMemos[index];state.resourceMemos.splice(index,1);
+  if(activeResourceMemoId===id)activeResourceMemoId=null;
+  save();
+  showDeleteUndo('메모가 삭제되었습니다',()=>{
+    if(!state.resourceMemos.some(x=>x.id===removed.id))state.resourceMemos.splice(Math.min(index,state.resourceMemos.length),0,removed);
+    save();
+  });
+};
 
 let resourceMemoSavedRange=null;
 function saveResourceMemoSelection(){
@@ -1134,7 +1169,7 @@ function openCalendarEventModal(id=null,presetDate=''){
   const sw=$('#calLeaveSwitch'),memberWrap=$('#calMemberWrap');
   sw.onchange=()=>memberWrap.classList.toggle('hidden',!sw.checked);
   if(existing)$('#deleteCalEvent').onclick=()=>{
-    state.calendarEvents=state.calendarEvents.filter(x=>x.id!==existing.id);save();closeModal();
+    deleteById('calendarEvents',existing.id);closeModal();
   };
   $('#calEventForm').onsubmit=e=>{
     e.preventDefault();
@@ -1156,7 +1191,52 @@ function openCalendarEventModal(id=null,presetDate=''){
 window.openCalendarEventModal=openCalendarEventModal;
 
 function renderAll(){renderHome();renderCalendar();renderUploads();renderShoots();renderAds();renderIdeas();renderMeetingsLanding();renderResources();renderResourceMemos();renderNotices();}
-window.deleteById=(key,id)=>{state[key]=state[key].filter(x=>x.id!==id);save();};
+let deleteUndoTimer=null;
+let deleteUndoAction=null;
+
+function showDeleteUndo(message='삭제되었습니다',restoreFn){
+  deleteUndoAction=restoreFn;
+  if(deleteUndoTimer)clearTimeout(deleteUndoTimer);
+  let toast=document.querySelector('#deleteUndoToast');
+  if(!toast){
+    toast=document.createElement('div');
+    toast.id='deleteUndoToast';
+    toast.className='delete-undo-toast';
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML=`<span>${esc(message)}</span><button type="button" onclick="undoLastDelete()">되돌리기</button>`;
+  requestAnimationFrame(()=>toast.classList.add('show'));
+  deleteUndoTimer=setTimeout(()=>{
+    toast.classList.remove('show');
+    deleteUndoAction=null;
+    deleteUndoTimer=null;
+    setTimeout(()=>toast.remove(),220);
+  },8000);
+}
+window.undoLastDelete=()=>{
+  if(!deleteUndoAction)return;
+  const restore=deleteUndoAction;
+  deleteUndoAction=null;
+  if(deleteUndoTimer)clearTimeout(deleteUndoTimer);
+  deleteUndoTimer=null;
+  document.querySelector('#deleteUndoToast')?.remove();
+  restore();
+};
+window.deleteById=(key,id)=>{
+  const list=Array.isArray(state[key])?state[key]:[];
+  const index=list.findIndex(x=>x.id===id);
+  if(index<0)return;
+  const removed=list[index];
+  list.splice(index,1);
+  save();
+  showDeleteUndo('삭제되었습니다',()=>{
+    state[key]=Array.isArray(state[key])?state[key]:[];
+    if(!state[key].some(x=>x.id===removed.id)){
+      state[key].splice(Math.min(index,state[key].length),0,removed);
+    }
+    save();
+  });
+};
 
 const modalDefs={
   ideaModal:{title:'아이디어 작성',key:'ideas',fields:[['title','아이디어 제목','text'],['content','내용','textarea'],['proposer','제안자','select',members]]},

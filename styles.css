@@ -786,3 +786,52 @@
   border-color:#e5e5e2 !important;
   color:#666 !important;
 }
+
+/* V3.51 global delete undo toast */
+.delete-undo-toast{
+  position:fixed;
+  left:50%;
+  bottom:28px;
+  z-index:99999;
+  display:flex;
+  align-items:center;
+  gap:16px;
+  min-width:240px;
+  max-width:calc(100vw - 32px);
+  padding:11px 12px 11px 16px;
+  border:1px solid #deded9;
+  border-radius:10px;
+  background:#2f2f2d;
+  color:#fff;
+  box-shadow:0 10px 30px rgba(0,0,0,.18);
+  opacity:0;
+  transform:translate(-50%,12px);
+  transition:opacity .18s ease,transform .18s ease;
+  pointer-events:none;
+}
+.delete-undo-toast.show{
+  opacity:1;
+  transform:translate(-50%,0);
+  pointer-events:auto;
+}
+.delete-undo-toast span{
+  flex:1;
+  font-size:11px;
+  line-height:1.4;
+  white-space:nowrap;
+}
+.delete-undo-toast button{
+  flex:0 0 auto;
+  border:0;
+  border-radius:7px;
+  background:#f1f1ee;
+  color:#333;
+  padding:7px 10px;
+  font-size:10px;
+  font-weight:800;
+  cursor:pointer;
+}
+.delete-undo-toast button:hover{background:#fff}
+@media(max-width:600px){
+  .delete-undo-toast{bottom:18px;min-width:0;width:calc(100vw - 28px)}
+}
