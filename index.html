@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>우리팀 잘 굴러가유</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="loginView" class="login-screen">
+    <div class="login-box">
+      <div class="login-kicker">TEAM DASHBOARD</div>
+      <h1>우리팀 잘 굴러가유</h1>
+      <p>주우재 · 이혜영 · 도운</p>
+      <form id="loginForm"><input id="passwordInput" type="password" placeholder="비밀번호" autocomplete="current-password" /><button type="submit">들어가기</button></form>
+      <small id="loginError"></small>
+    </div>
+  </div>
+
+  <div id="appView" class="layout hidden">
+    <aside class="sidebar">
+      <div class="brand"><span>🎬</span><strong>우리팀<br>잘 굴러가유</strong></div>
+      <nav id="nav" class="nav">
+        <button class="active" data-page="home"><span>⌂</span> 홈</button>
+        <button data-page="calendar"><span>□</span> 캘린더</button>
+        <button data-page="meetings"><span>✎</span> 회의</button>
+        <button data-page="uploads"><span>▷</span> 업로드 스케줄</button>
+        <button data-page="shoots"><span>●</span> 촬영</button>
+        <button data-page="ads"><span>₩</span> 광고</button>
+        <button data-page="resources"><span>↗</span> 리소스 허브</button>
+        <button data-page="notices"><span>!</span> 공지 게시판</button>
+      </nav>
+      <div class="sidebar-links">
+        <a href="https://www.youtube.com/@todaysjoowoojae" target="_blank"><i class="c c-joo"></i>오늘의 주우재</a>
+        <a href="https://www.youtube.com/@Cantstop_Haeyoung" target="_blank"><i class="c c-hye"></i>혜영이는 못말려</a>
+        <a href="https://www.youtube.com/@ydwdy" target="_blank"><i class="c c-dow"></i>윤도운도윤</a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="header">
+        <div class="search-wrap">⌕ <input id="globalSearch" placeholder="영상 제목, 브랜드, 촬영, 회의록 통합 검색..." /></div>
+        <div class="header-right"><span id="todayLabel"></span><button class="outline" id="exportBtn">백업</button></div>
+      </header>
+
+      <section id="home" class="page active-page">
+        <div class="page-title-only"><h1>오늘의 현황</h1></div>
+        <div class="schedule-overview">
+          <section class="schedule-column"><div class="section-title"><b>오늘 일정</b><span id="todayCount">0</span></div><div id="todaySchedule" class="schedule-list"></div></section>
+          <section class="schedule-column"><div class="section-title"><b>내일 예정</b><span id="tomorrowCount">0</span></div><div id="tomorrowSchedule" class="schedule-list"></div></section>
+          <section class="schedule-column"><div class="section-title"><b>이번 주 업로드</b><span id="weekCount">0</span></div><div id="weekUploads" class="schedule-list"></div></section>
+        </div>
+        <div id="homeAlert" class="attention hidden"></div>
+        <div class="home-row-head"><div><h3>팀원 현황</h3><p>당일 근무 상태와 업무를 한눈에 확인해요.</p></div><button class="tiny-btn" data-open="todoModal">+ 업무 추가</button></div>
+        <div id="memberBoard" class="member-board"></div>
+        <div class="home-bottom-grid">
+          <section><div class="home-row-head compact"><div><h3>다가오는 촬영</h3></div><button class="text-btn" data-open="shootModal">+ 추가</button></div><div id="homeShoots" class="simple-list"></div></section>
+          <section><div class="home-row-head compact"><div><h3>공지</h3></div><button class="text-btn" data-open="noticeModal">+ 작성</button></div><div id="homeNotices" class="simple-list"></div></section>
+        </div>
+      </section>
+
+      <section id="calendar" class="page">
+        <div class="page-head"><div><h1>캘린더</h1><p>팀 캘린더 3개를 한 화면에 모았어요.</p></div><a class="outline as-link" href="https://calendar.google.com/calendar/u/3/r" target="_blank">구글 캘린더에서 열기 ↗</a></div>
+        <div class="calendar-key"><span><i class="c c-joo"></i> episodes.winter</span><span><i class="c c-hye"></i> 팀 캘린더 2</span><span><i class="c c-dow"></i> 팀 캘린더 3</span></div>
+        <div class="calendar-shell"><iframe class="calendar-frame" title="팀 구글 캘린더" src="https://calendar.google.com/calendar/embed?height=760&wkst=1&ctz=Asia%2FSeoul&showPrint=0&showTabs=1&showCalendars=1&showTz=0&src=ZXBpc29kZXMud2ludGVyQGdtYWlsLmNvbQ&src=ZjEzODZlOWI4Nzg3OGMxMDVjYjIyNDVkNDE4ZTZjNjlhODFiYmRjOTNkZWQyZWJiYmQ0ZDgzMWFkMDhlMjQyNkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t&src=MTk1MTU4NWQzNGEwODJiNzA4NDA4MjhhYjQ0MTUxNTlkZDMwYjBmZjFmYWViYTBlZGFkN2Q2NDc0YTBiNjdkYkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t" frameborder="0" scrolling="no"></iframe></div>
+      </section>
+
+      <section id="meetings" class="page">
+        <div id="meetingLanding"></div>
+        <div id="meetingDetail" class="hidden"></div>
+      </section>
+
+      <section id="uploads" class="page">
+        <div class="page-head"><div><h1>업로드 스케줄</h1><p>주차별 업로드 일정과 진행 상태.</p></div><button class="accent-btn" data-open="uploadModal">일정 추가</button></div>
+        <div id="uploadControls" class="filter-panel"></div>
+        <div id="uploadSchedule" class="upload-schedule"></div>
+        <section class="edit-timeline-section">
+          <div class="timeline-head"><div><h2>편집 타임라인</h2><p>담당자별 편집 기간을 한눈에 확인해요.</p></div><span>← 가로로 스크롤해서 전체 일정 확인 →</span></div>
+          <div id="editTimeline" class="edit-timeline-wrap"></div>
+        </section>
+      </section>
+
+      <section id="shoots" class="page">
+        <div class="page-head"><div><h1>🎬 촬영</h1><p>영상 카드를 클릭하면 촬영 정보를 수정할 수 있어요.</p></div><button class="accent-btn" data-open="shootModal">촬영 추가</button></div>
+        <div id="shootSummary" class="shoot-summary"></div>
+        <div id="shootColumns" class="channel-columns"></div>
+      </section>
+
+      <section id="ads" class="page">
+        <div class="page-head"><div><h1>광고</h1><p>채널별 브랜드 광고와 전달 상태.</p></div><button class="accent-btn" data-open="adModal">광고 추가</button></div>
+        <div id="adColumns" class="channel-columns"></div>
+        <div id="adKpi" class="ad-kpi"></div>
+      </section>
+
+      <section id="resources" class="page">
+        <div class="page-head"><div><h1>리소스 허브</h1><p>자주 쓰는 채널, 문서, 드라이브 링크.</p></div><button class="accent-btn" data-open="resourceModal">+ 링크 추가</button></div>
+        <div id="resourceGrid" class="tile-grid"></div>
+      </section>
+
+      <section id="notices" class="page">
+        <div class="page-head"><div><h1>공지 게시판</h1><p>팀 전체가 알아야 하는 내용을 남겨요.</p></div><button class="accent-btn" data-open="noticeModal">+ 공지 작성</button></div>
+        <div id="noticeList" class="doc-list"></div>
+      </section>
+    </main>
+  </div>
+  <div id="modalRoot"></div>
+  <script src="app.js"></script>
+</body>
+</html>
