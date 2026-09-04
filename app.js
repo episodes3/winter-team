@@ -1054,7 +1054,7 @@ window.deleteById=(key,id)=>{state[key]=state[key].filter(x=>x.id!==id);save();}
 
 const modalDefs={
   ideaModal:{title:'아이디어 작성',key:'ideas',fields:[['title','아이디어 제목','text'],['content','내용','textarea'],['proposer','제안자','select',members]]},
-  todoModal:{title:'업무 추가',key:'todos',fields:[['title','업무 내용','text'],['assignee','담당자','select',members],['channel','채널','select',channels],['status','상태','select',statuses],['due','마감일','date']]},
+  todoModal:{title:'업무 추가',key:'todos',fields:[['assignee','담당자','select',members],['channel','채널','select',channels],['title','업무 내용','textarea']]},
   uploadModal:{title:'업로드 일정',key:'uploads',fields:[['channel','채널','select',channels],['type','유형','select',['롱폼','쇼츠','기타']],['title','영상 제목','text'],['assignee','담당자','select',members],['date','업로드일','date'],['status','상태','select',uploadStatuses]]},
   shootModal:{title:'촬영 정보',key:'shoots',fields:[['channel','채널','select',channels],['title','영상 제목','text'],['assignee','담당 PD','select',members],['date','촬영일','date'],['method','촬영 방식','select',['PD 자체 촬영','촬영팀 동행','셀프캠','기타']],['crew','촬영팀 / 참여자 (쉼표 구분)','text'],['equipment','장비','text'],['notes','준비사항 / 유의사항','textarea']]},
   adModal:{title:'광고 정보',key:'ads',fields:[['channel','채널','select',channels],['adType','분류','select',['BDC','기획PPL','단순PPL','쇼츠']],['brand','브랜드명','text'],['product','광고 제품','text'],['assignee','담당자','select',adManagers],['pd','담당PD','select',members],['status','상태','select',['내부 논의중','소속사 논의중','구성안 작성중','촬영 완료','업로드 완료']],['amount','광고 금액','number'],['proposal','구성안 전달일','date'],['rough','가편 전달일','date'],['final','최종본 전달일','date'],['memo','메모','textarea']]},
