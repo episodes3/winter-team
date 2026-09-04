@@ -1057,19 +1057,38 @@ function renderNotices(){
     board.innerHTML=`<div class="notice-empty">아직 공지가 없어요</div>`;
     return;
   }
-  board.innerHTML=list.map(x=>`<article class="notice-row ${x.pinned?'pinned':''}" onclick="openNoticeModal('${x.id}')">
+  board.innerHTML=list.map(x=>`<article class="notice-row notice-title-only ${x.pinned?'pinned':''}" onclick="openNoticeDetail('${x.id}')">
     <div class="notice-pin">${x.pinned?'📌':''}</div>
     <div class="notice-main">
       <div class="notice-title-line">
         <strong>${esc(x.title||'제목 없음')}</strong>
         ${x.pinned?'<span>상단 고정</span>':''}
       </div>
-      <p>${autoLinkText(x.content||'')}</p>
-      <div class="notice-meta">${x.author?`<span>${esc(x.author)}</span>`:''}<span>${esc(x.createdAt||x.date||'')}</span></div>
     </div>
   </article>`).join('');
 }
 window.setNoticeView=view=>{noticeView=view;renderNotices();};
+function openNoticeDetail(id){
+  const existing=state.notices.find(x=>x.id===id);if(!existing)return;
+  const vals=normalizeNotice(existing);
+  $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal notice-detail-modal">
+    <div class="modal-head"><div><small>${vals.board==='internal'?'🔒 내부 공지':'🎬 에피소드 공지'}</small><h3>${esc(vals.title||'제목 없음')}</h3></div><button class="icon-btn" id="closeModal">×</button></div>
+    <div class="notice-detail-body">
+      <div class="notice-detail-meta">${vals.pinned?'<span class="notice-detail-pin">📌 상단 고정</span>':''}${vals.author?`<span>${esc(vals.author)}</span>`:''}<span>${esc(vals.createdAt||vals.date||'')}</span></div>
+      <div class="notice-detail-content">${autoLinkText(vals.content||'')}</div>
+    </div>
+    <div class="modal-actions notice-detail-actions">
+      <span></span><span></span>
+      <button type="button" class="outline" id="closeNoticeDetail">닫기</button>
+      <button type="button" class="accent-btn" id="editNoticeDetail">수정</button>
+    </div>
+  </div></div>`;
+  $('#closeModal').onclick=closeModal;
+  $('#closeNoticeDetail').onclick=closeModal;
+  $('#editNoticeDetail').onclick=()=>openNoticeModal(existing.id);
+}
+window.openNoticeDetail=openNoticeDetail;
+
 function openNoticeModal(id=null){
   const existing=id?state.notices.find(x=>x.id===id):null;
   const vals=existing?normalizeNotice(existing):{board:noticeView,title:'',content:'',author:'',pinned:false};
