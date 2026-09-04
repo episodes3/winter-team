@@ -178,3 +178,75 @@
 .shoot-date-remove{width:34px;border:0;background:transparent;color:#aaa;font-size:20px;cursor:pointer}.shoot-date-remove:hover{color:#d45d5d}
 .shoot-date-add{width:100%;padding:10px;border:1px dashed #d3d3cf;border-radius:9px;background:#fafaf8;color:#555;font-size:11px;font-weight:700;cursor:pointer}.shoot-date-add:hover{background:#f3f4ed;border-color:#bdcf8e}
 @media(max-width:650px){.shoot-date-row{grid-template-columns:1fr}.shoot-date-remove{width:100%;height:28px}}
+
+/* Simple idea archive V3.11 */
+.idea-tabs{display:flex;align-items:center;gap:7px}
+.idea-tabs button{border:1px solid #e1e1dd;background:#fff;border-radius:99px;padding:7px 12px;color:#777;font-size:11px;font-weight:700;cursor:pointer}
+.idea-tabs button span{display:inline-flex;min-width:18px;justify-content:center;margin-left:4px;padding:1px 5px;border-radius:99px;background:#f1f1ee;font-size:9px}
+.idea-tabs button.active{background:#222;color:#fff;border-color:#222}
+.idea-tabs button.active span{background:rgba(255,255,255,.18)}
+.idea-card-actions{display:flex;justify-content:flex-end;margin-top:14px}
+.idea-archive-btn{border:1px solid #deded9;background:#fff;border-radius:7px;padding:6px 9px;color:#777;font-size:10px;font-weight:700;cursor:pointer}
+.idea-archive-btn:hover{background:#f3f3ef;color:#333}
+.idea-archived{filter:saturate(.75)}
+.idea-archived:before{content:"보관됨";position:absolute;right:17px;top:16px;padding:3px 7px;border-radius:99px;background:#f0f0ed;color:#888;font-size:8px;font-weight:700}
+
+/* Timeline milestones V3.12 */
+.timeline-row{min-height:48px}
+.timeline-milestone{position:absolute;z-index:5;top:50%;transform:translate(-50%,-50%);width:25px;height:25px;padding:0;border:0;background:rgba(255,255,255,.92);border-radius:50%;font-size:15px;line-height:25px;text-align:center;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.timeline-milestone:hover{transform:translate(-50%,-50%) scale(1.12)}
+.timeline-milestone.draft{margin-top:11px}
+.timeline-milestone.upload{margin-top:-11px}
+.timeline-legend{position:sticky;left:0;display:flex;gap:16px;width:max-content;margin-top:12px;padding:7px 10px;border:1px solid #e5e5e2;border-radius:8px;background:#fff;font-size:10px;font-weight:700;color:#666}
+
+/* Notice board V3.13 */
+.notice-page-head{align-items:flex-start}.notice-page-head h1{font-size:25px;margin-bottom:6px}.notice-page-head p{color:#999;font-size:11px}
+.notice-write-btn{border:0;border-radius:14px;padding:11px 17px;background:#ffb800;color:#222;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 5px 14px rgba(255,184,0,.22)}
+.notice-tabs{display:inline-flex;gap:0;margin:18px 0 22px;padding:4px;background:#f3f3f3;border-radius:999px}
+.notice-tabs button{border:0;background:transparent;padding:9px 18px;border-radius:999px;color:#777;font-size:11px;font-weight:700;cursor:pointer}
+.notice-tabs button.active{background:#4d91b8;color:#fff}
+.notice-board{border:1px solid #ececea;border-radius:16px;overflow:hidden;background:#fff;min-height:90px}
+.notice-empty{display:flex;align-items:center;justify-content:center;min-height:90px;color:#aaa;font-size:11px}
+.notice-row{display:grid;grid-template-columns:34px 1fr;gap:6px;padding:16px 18px;border-bottom:1px solid #eee;cursor:pointer}.notice-row:last-child{border-bottom:0}.notice-row:hover{background:#fafaf8}.notice-row.pinned{background:#fffdf6}
+.notice-pin{padding-top:2px}.notice-title-line{display:flex;align-items:center;gap:8px}.notice-title-line strong{font-size:14px}.notice-title-line span{font-size:9px;padding:2px 6px;border-radius:99px;background:#fff1bd;color:#926c00}.notice-main p{margin:7px 0;color:#666;font-size:11px;line-height:1.65}.notice-meta{display:flex;gap:10px;color:#aaa;font-size:9px}
+.notice-compose-modal{width:min(620px,calc(100vw - 30px));max-height:92vh;overflow:auto}.notice-compose-modal .modal-head h3{font-size:22px}
+.notice-form-body{display:flex;flex-direction:column;gap:18px}.notice-form-body label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:700;color:#555}.notice-form-body input,.notice-form-body select,.notice-form-body textarea{width:100%;border:1px solid #d4d4d1;border-radius:10px;background:#fff;padding:12px 13px;font:inherit;color:#333;outline:none}.notice-form-body textarea{min-height:150px;resize:vertical;line-height:1.65}
+.notice-pin-check{flex-direction:row!important;align-items:center;gap:8px!important}.notice-pin-check input{width:17px!important;height:17px!important}
+.notice-save-btn{border:0;border-radius:14px;padding:11px 18px;background:#ffb800;color:#222;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(255,184,0,.18)}
+
+/* Home task edit/delete V3.14 */
+.mini-task{cursor:pointer}
+.mini-task:hover{background:#f7f7f4}
+.mini-task-right{display:flex;align-items:center;gap:7px}
+.mini-task-delete{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border:0;border-radius:6px;background:transparent;color:#aaa;font-size:16px;cursor:pointer}
+.mini-task-delete:hover{background:#f3e8e8;color:#c45d5d}
+
+/* Home upload schedule sync V3.15 */
+.upload-mini-task{border-left:3px solid #8fb6d1;padding-left:9px}
+.upload-mini-task .mini-task-kind{display:inline-block;margin-right:5px;padding:2px 6px;border-radius:99px;background:#edf5fa;color:#4d86a7;font-size:9px;font-weight:800;vertical-align:1px}
+.upload-mini-task:hover{background:#f5fafc}
+
+/* Home To Do List V3.16 */
+.home-todo-section{margin:18px 0 20px;padding:18px 20px;border:1px solid #e8e8e5;border-radius:14px;background:#fff}
+.home-todo-head{margin:0 0 12px}
+.home-todo-head h3{font-size:15px}
+.home-todo-head p{margin-top:3px;color:#999;font-size:10px}
+.home-todo-list{display:flex;flex-direction:column;gap:7px}
+.home-todo-item{display:grid;grid-template-columns:25px 1fr 24px;align-items:start;gap:9px;padding:10px 11px;border:1px solid #ecece8;border-radius:9px;background:#fafaf8;cursor:pointer}
+.home-todo-item:hover{background:#f7f7f3;border-color:#deded8}
+.home-todo-check{width:21px;height:21px;border:1px solid #bdbdb7;border-radius:6px;background:#fff;color:#63774a;font-size:12px;font-weight:800;cursor:pointer}
+.home-todo-item.done .home-todo-check{background:#edf3df;border-color:#b8ca91}
+.home-todo-content{min-width:0;padding-top:1px;color:#333;font-size:11px;line-height:1.65;word-break:break-word}
+.home-todo-item.done .home-todo-content{color:#aaa;text-decoration:line-through}
+.home-todo-delete{border:0;background:transparent;color:#bbb;font-size:16px;cursor:pointer}
+.home-todo-delete:hover{color:#c65f5f}
+.home-todo-empty{padding:16px;text-align:center;border:1px dashed #deded9;border-radius:9px;color:#aaa;font-size:10px}
+.home-todo-empty button{border:0;background:transparent;color:#6c8050;font-weight:700;cursor:pointer}
+.home-todo-modal{width:min(620px,calc(100vw - 30px))}
+.home-todo-editor-wrap{display:flex;flex-direction:column;gap:7px}
+.rich-toolbar{display:flex;gap:5px}
+.rich-toolbar button{min-width:34px;height:30px;padding:0 9px;border:1px solid #deded9;border-radius:7px;background:#fff;color:#555;font-size:11px;cursor:pointer}
+.rich-toolbar button:hover{background:#f4f4f1}
+.home-todo-editor{min-height:150px;padding:13px 14px;border:1px solid #d8d8d3;border-radius:10px;background:#fff;color:#333;font-size:12px;line-height:1.7;outline:none}
+.home-todo-editor:focus{border-color:#b7c98a;box-shadow:0 0 0 3px rgba(183,201,138,.14)}
+.home-todo-editor:empty:before{content:attr(data-placeholder);color:#aaa;pointer-events:none}

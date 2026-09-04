@@ -31,6 +31,7 @@ function seed(){
       {id:uid(),title:'광고 제안서 수정',assignee:'키엘',channel:'주우재',status:'편집중',due:''},
       {id:uid(),title:'대본 1차 작성',assignee:'브루나',channel:'도운',status:'기획',due:''}
     ],
+    homeTodos:[],
     uploads:[
       {id:uid(),channel:'주우재',type:'롱폼',title:'가을 옷 구경 입어만볼게요',assignee:'윈터',date:addDaysISO(2),status:'기획'},
       {id:uid(),channel:'이혜영',type:'쇼츠',title:'웨이션 하울',assignee:'파타',date:addDaysISO(5),status:'편집중'},
@@ -69,9 +70,9 @@ function seed(){
 }
 function load(){
   const saved=JSON.parse(localStorage.getItem('teamDashDataV3')||'null');
-  if(saved){saved.ideas=Array.isArray(saved.ideas)?saved.ideas:[];return saved;}
+  if(saved){saved.ideas=Array.isArray(saved.ideas)?saved.ideas.map(x=>({...x,archived:Boolean(x.archived)})):[];saved.homeTodos=Array.isArray(saved.homeTodos)?saved.homeTodos:[];return saved;}
   const old=JSON.parse(localStorage.getItem('teamDashDataV2')||'null'); const base=seed();
-  if(old){['todos','uploads','shoots','ads','meetings','notices','schedules','resources','ideas'].forEach(k=>{if(old[k]?.length)base[k]=old[k].map(x=>({...x,id:x.id||uid()}));});}
+  if(old){['todos','homeTodos','uploads','shoots','ads','meetings','notices','schedules','resources','ideas'].forEach(k=>{if(old[k]?.length)base[k]=old[k].map(x=>({...x,id:x.id||uid()}));});}
   return base;
 }
 const state=load();
@@ -95,12 +96,89 @@ function renderHome(){
   const today=scheduleItems.filter(x=>x.date===td), tomorrow=scheduleItems.filter(x=>x.date===tm), week=state.uploads.filter(x=>x.date&&new Date(x.date+'T00:00:00')>=new Date(td+'T00:00:00')&&new Date(x.date+'T00:00:00')<=weekEnd).sort((a,b)=>a.date.localeCompare(b.date));
   $('#todayCount').textContent=today.length;$('#tomorrowCount').textContent=tomorrow.length;$('#weekCount').textContent=week.length;
   $('#todaySchedule').innerHTML=renderSchedule(today,'오늘 일정이 없어요');$('#tomorrowSchedule').innerHTML=renderSchedule(tomorrow,'예정된 일정이 없어요');$('#weekUploads').innerHTML=renderSchedule(week.map(x=>({...x,kind:'업로드'})),'이번 주 업로드가 없어요');
+  renderHomeTodos();
   const overdue=state.ads.filter(x=>x.final&&x.final<td&&x.status!=='업로드완료');
   $('#homeAlert').classList.toggle('hidden',!overdue.length);if(overdue.length)$('#homeAlert').innerHTML=`<b>주의 필요</b><span>${overdue.length}건 마감 지남</span><strong>📣 ${esc(overdue[0].brand)} 최종본 전달</strong><em>광고</em>`;
-  $('#memberBoard').innerHTML=members.map(m=>{const col=memberColors[m],tasks=state.todos.filter(t=>t.assignee===m).slice(0,3),ws=state.memberStatus?.[m]||'근무중';return `<article class="member-card" style="--member-bg:${col.bg};--member-line:${col.line}"><div class="member-head"><div class="member-name"><span class="avatar" style="background:${col.line}">${m[0]}</span><div><b>${m}</b><small>${workBadge(ws)}</small></div></div><select class="work-select" onchange="setWorkStatus('${m}',this.value)">${workStatuses.map(s=>`<option ${s===ws?'selected':''}>${s}</option>`).join('')}</select></div><div class="member-tasks">${tasks.length?tasks.map(t=>`<div class="mini-task"><span>○ &nbsp;${esc(t.title)}</span><em>${esc(t.status)}</em></div>`).join(''):'<div class="no-task">등록된 업무가 없어요.</div>'}</div><button class="member-add" onclick="openTodoFor('${m}')">+ 업무 추가</button></article>`;}).join('');
+  $('#memberBoard').innerHTML=members.map(m=>{
+    const col=memberColors[m],ws=state.memberStatus?.[m]||'근무중';
+    const manualTasks=state.todos.filter(t=>t.assignee===m).map(t=>({kind:'todo',id:t.id,title:t.title,status:t.status||'',date:t.due||''}));
+    const uploadTasks=state.uploads.filter(u=>uploadAssignees(u).includes(m)).map(u=>({kind:'upload',id:u.id,title:u.title,status:u.status||'',date:u.date||''}));
+    const tasks=[...manualTasks,...uploadTasks].sort((a,b)=>{
+      if(a.date&&b.date)return a.date.localeCompare(b.date);
+      if(a.date)return -1;if(b.date)return 1;return 0;
+    }).slice(0,6);
+    return `<article class="member-card" style="--member-bg:${col.bg};--member-line:${col.line}"><div class="member-head"><div class="member-name"><span class="avatar" style="background:${col.line}">${m[0]}</span><div><b>${m}</b><small>${workBadge(ws)}</small></div></div><select class="work-select" onchange="setWorkStatus('${m}',this.value)">${workStatuses.map(s=>`<option ${s===ws?'selected':''}>${s}</option>`).join('')}</select></div><div class="member-tasks">${tasks.length?tasks.map(t=>t.kind==='upload'?`<div class="mini-task upload-mini-task" onclick="openUploadModal('${t.id}')" title="업로드 일정 수정"><span><b class="mini-task-kind">업로드</b>${esc(t.title)}</span><div class="mini-task-right"><em>${t.date?fmtDate(t.date):esc(t.status)}</em></div></div>`:`<div class="mini-task" onclick="openModal('todoModal','${t.id}')" title="클릭해서 수정"><span>○ &nbsp;${esc(t.title)}</span><div class="mini-task-right"><em>${esc(t.status)}</em><button type="button" class="mini-task-delete" onclick="event.stopPropagation();deleteById('todos','${t.id}')" title="업무 삭제">×</button></div></div>`).join(''):'<div class="no-task">등록된 업무가 없어요.</div>'}</div><button class="member-add" onclick="openTodoFor('${m}')">+ 업무 추가</button></article>`;
+  }).join('');
   const shoots=[...state.shoots].filter(x=>x.date).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);$('#homeShoots').innerHTML=shoots.length?shoots.map(x=>`<div class="simple-row">${channelPill(x.channel)}<b>${esc(x.title)}</b><small>${fmtDate(x.date)} · ${esc(x.assignee)}</small></div>`).join(''):'<div class="empty">등록된 촬영이 없어요.</div>';
   $('#homeNotices').innerHTML=state.notices.length?[...state.notices].reverse().slice(0,5).map(x=>`<div class="simple-row">${channelPill(x.channel)}<b>${esc(x.title)}</b><small>${esc(x.author)}</small></div>`).join(''):'<div class="empty">공지사항이 없어요.</div>';
 }
+
+function safeHomeTodoHtml(html){
+  const box=document.createElement('div');box.innerHTML=html||'';
+  const walk=node=>{
+    [...node.childNodes].forEach(ch=>{
+      if(ch.nodeType===3)return;
+      if(ch.nodeType!==1){ch.remove();return;}
+      const tag=ch.tagName.toLowerCase();
+      if(tag==='b'){const strong=document.createElement('strong');strong.innerHTML=ch.innerHTML;ch.replaceWith(strong);walk(strong);return;}
+      if(!['strong','br','div','p'].includes(tag)){
+        const frag=document.createDocumentFragment();while(ch.firstChild)frag.appendChild(ch.firstChild);ch.replaceWith(frag);return;
+      }
+      [...ch.attributes].forEach(a=>ch.removeAttribute(a.name));walk(ch);
+    });
+  };
+  walk(box);return box.innerHTML;
+}
+function homeTodoText(html){
+  const box=document.createElement('div');box.innerHTML=html||'';return (box.textContent||'').trim();
+}
+function renderHomeTodos(){
+  const list=$('#homeTodoList');if(!list)return;
+  state.homeTodos=Array.isArray(state.homeTodos)?state.homeTodos:[];
+  const items=[...state.homeTodos].sort((a,b)=>Number(a.done)-Number(b.done)||String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
+  list.innerHTML=items.length?items.map(x=>`<div class="home-todo-item ${x.done?'done':''}" onclick="openHomeTodoModal('${x.id}')">
+    <button type="button" class="home-todo-check" onclick="event.stopPropagation();toggleHomeTodo('${x.id}')" aria-label="완료">${x.done?'✓':''}</button>
+    <div class="home-todo-content">${safeHomeTodoHtml(x.richHtml||esc(x.text||''))}</div>
+    <button type="button" class="home-todo-delete" onclick="event.stopPropagation();deleteHomeTodo('${x.id}')" aria-label="삭제">×</button>
+  </div>`).join(''):`<div class="home-todo-empty">아직 할 일이 없어요. <button onclick="openHomeTodoModal()">+ 첫 항목 추가</button></div>`;
+}
+window.toggleHomeTodo=id=>{const x=state.homeTodos.find(v=>v.id===id);if(!x)return;x.done=!x.done;save();};
+window.deleteHomeTodo=id=>{state.homeTodos=state.homeTodos.filter(v=>v.id!==id);save();};
+function homeTodoFormat(cmd){
+  const editor=$('#homeTodoEditor');if(!editor)return;
+  editor.focus();
+  if(cmd==='bold')document.execCommand('bold',false,null);
+  if(cmd==='normal')document.execCommand('removeFormat',false,null);
+}
+window.homeTodoFormat=homeTodoFormat;
+function openHomeTodoModal(id=null){
+  state.homeTodos=Array.isArray(state.homeTodos)?state.homeTodos:[];
+  const existing=id?state.homeTodos.find(x=>x.id===id):null;
+  const initial=existing?.richHtml||esc(existing?.text||'');
+  $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal home-todo-modal">
+    <div class="modal-head"><h3>${existing?'To Do 수정':'To Do 추가'}</h3><button class="icon-btn" id="closeModal">×</button></div>
+    <div class="home-todo-editor-wrap">
+      <div class="rich-toolbar">
+        <button type="button" onmousedown="event.preventDefault();homeTodoFormat('bold')"><b>B</b></button>
+        <button type="button" onmousedown="event.preventDefault();homeTodoFormat('normal')">기본</button>
+      </div>
+      <div id="homeTodoEditor" class="home-todo-editor" contenteditable="true" data-placeholder="할 일을 입력하세요">${initial}</div>
+    </div>
+    <div class="modal-actions">${existing?'<button type="button" class="danger-btn" id="deleteHomeTodoModal">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button type="button" class="accent-btn" id="saveHomeTodo">저장</button></div>
+  </div></div>`;
+  $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
+  if(existing)$('#deleteHomeTodoModal').onclick=()=>{deleteHomeTodo(existing.id);closeModal();};
+  $('#saveHomeTodo').onclick=()=>{
+    const editor=$('#homeTodoEditor'),richHtml=safeHomeTodoHtml(editor.innerHTML),text=homeTodoText(richHtml);
+    if(!text){editor.focus();return;}
+    if(existing){existing.richHtml=richHtml;existing.text=text;}
+    else state.homeTodos.push({id:uid(),text,richHtml,done:false,createdAt:new Date().toISOString()});
+    save();closeModal();
+  };
+  setTimeout(()=>$('#homeTodoEditor')?.focus(),0);
+}
+window.openHomeTodoModal=openHomeTodoModal;
+
 window.setWorkStatus=(m,v)=>{state.memberStatus=state.memberStatus||{};state.memberStatus[m]=v;save();};
 window.openTodoFor=m=>openModal('todoModal',null,{assignee:m});
 
@@ -130,14 +208,27 @@ function eachDate(start,end){const arr=[],d=new Date(start+'T00:00:00'),e=new Da
 function renderEditTimeline(items){
   const assignments=[];
   items.forEach(x=>uploadAssignees(x).forEach(m=>{const r=inferredEditRange(x,m);if(r.start&&r.end)assignments.push({item:x,member:m,start:r.start,end:r.end})}));
-  if(!assignments.length){$('#editTimeline').innerHTML='<div class="empty large-empty">담당자를 선택하고 편집 기간을 입력하면 타임라인이 표시돼요.</div>';return;}
-  let min=assignments.map(a=>a.start).sort()[0],max=[...assignments.map(a=>a.end),...items.map(x=>x.date).filter(Boolean)].sort().slice(-1)[0];
+  const milestoneDates=items.flatMap(x=>[x.firstDraftDate,x.date].filter(Boolean));
+  if(!assignments.length&&!milestoneDates.length){$('#editTimeline').innerHTML='<div class="empty large-empty">담당자를 선택하고 편집 기간을 입력하면 타임라인이 표시돼요.</div>';return;}
+  const starts=[...assignments.map(a=>a.start),...milestoneDates].filter(Boolean).sort();
+  const ends=[...assignments.map(a=>a.end),...milestoneDates].filter(Boolean).sort();
+  let min=starts[0],max=ends.slice(-1)[0];
   let sd=new Date(min+'T00:00:00'),ed=new Date(max+'T00:00:00');sd.setDate(sd.getDate()-2);ed.setDate(ed.getDate()+3);min=localDate(sd);max=localDate(ed);
   const days=eachDate(min,max),dayW=34,labelW=92,totalW=labelW+days.length*dayW;
   const monthSpans=[];let cur=null;days.forEach((ds,i)=>{const d=new Date(ds+'T00:00:00'),key=`${d.getFullYear()}-${d.getMonth()+1}`;if(!cur||cur.key!==key){cur={key,label:`${d.getFullYear()}년 ${d.getMonth()+1}월`,start:i,count:0};monthSpans.push(cur)}cur.count++});
   const header=`<div class="timeline-canvas" style="width:${totalW}px"><div class="timeline-months" style="padding-left:${labelW}px">${monthSpans.map(m=>`<div style="width:${m.count*dayW}px">${m.label}</div>`).join('')}</div><div class="timeline-days" style="padding-left:${labelW}px">${days.map(ds=>{const d=new Date(ds+'T00:00:00'),wk=d.getDay(),weekend=wk===0||wk===6;return `<div class="${weekend?'weekend':''}" style="width:${dayW}px">${d.getDate()}</div>`}).join('')}</div>`;
-  const rows=members.map(m=>{const bars=assignments.filter(a=>a.member===m).map(a=>{const si=days.indexOf(a.start),ei=days.indexOf(a.end);if(si<0||ei<0)return '';const left=labelW+si*dayW+3,width=(ei-si+1)*dayW-6;return `<button class="timeline-bar ${channelClass[a.item.channel]} ${a.item.sevenNeed?'save-needed':''}" style="left:${left}px;width:${width}px" onclick="editItem('uploads','${a.item.id}')" title="${esc(a.item.title)}">${a.item.sevenNeed?'⭐ ':''}${esc(a.item.title)}</button>`}).join('');return `<div class="timeline-row" style="width:${totalW}px"><div class="timeline-person">${m}</div>${days.map((ds,i)=>{const d=new Date(ds+'T00:00:00'),weekend=[0,6].includes(d.getDay());return `<span class="timeline-cell ${weekend?'weekend':''}" style="left:${labelW+i*dayW}px;width:${dayW}px"></span>`}).join('')}${bars}</div>`}).join('');
-  $('#editTimeline').innerHTML=`${header}${rows}</div>`;
+  const rows=members.map(m=>{
+    const memberAssignments=assignments.filter(a=>a.member===m);
+    const bars=memberAssignments.map(a=>{const si=days.indexOf(a.start),ei=days.indexOf(a.end);if(si<0||ei<0)return '';const left=labelW+si*dayW+3,width=(ei-si+1)*dayW-6;return `<button class="timeline-bar ${channelClass[a.item.channel]} ${a.item.sevenNeed?'save-needed':''}" style="left:${left}px;width:${width}px" onclick="editItem('uploads','${a.item.id}')" title="${esc(a.item.title)}">${a.item.sevenNeed?'⭐ ':''}${esc(a.item.title)}</button>`}).join('');
+    const milestones=memberAssignments.map(a=>{
+      const marks=[];
+      if(a.item.firstDraftDate){const i=days.indexOf(a.item.firstDraftDate);if(i>=0){const left=labelW+i*dayW+dayW/2;marks.push(`<button class="timeline-milestone draft" style="left:${left}px" onclick="editItem('uploads','${a.item.id}')" title="1차 가편 공유 · ${esc(a.item.title)}">✔️</button>`);}}
+      if(a.item.date){const i=days.indexOf(a.item.date);if(i>=0){const left=labelW+i*dayW+dayW/2;marks.push(`<button class="timeline-milestone upload" style="left:${left}px" onclick="editItem('uploads','${a.item.id}')" title="업로드일 · ${esc(a.item.title)}">💟</button>`);}}
+      return marks.join('');
+    }).join('');
+    return `<div class="timeline-row" style="width:${totalW}px"><div class="timeline-person">${m}</div>${days.map((ds,i)=>{const d=new Date(ds+'T00:00:00'),weekend=[0,6].includes(d.getDay());return `<span class="timeline-cell ${weekend?'weekend':''}" style="left:${labelW+i*dayW}px;width:${dayW}px"></span>`}).join('')}${bars}${milestones}</div>`;
+  }).join('');
+  $('#editTimeline').innerHTML=`${header}${rows}</div><div class="timeline-legend"><span>✔️ 1차 가편 공유</span><span>💟 업로드일</span></div>`;
 }
 function openUploadModal(id=null){
   const existing=id?state.uploads.find(x=>x.id===id):null;
@@ -330,24 +421,91 @@ window.renderCurrentMeeting=(meetingId)=>{const m=state.meetings.find(x=>x.id===
 window.addMeetingWeek=(year,month)=>{const used=new Set(meetingMonthData(year,month).map(x=>String(x.week)));const w=['1','2','3','4','5'].find(x=>!used.has(x));if(w)renderMeetingMonth(year,month,w);};
 
 
+let ideaView='active';
 function renderIdeas(){
   state.ideas=Array.isArray(state.ideas)?state.ideas:[];
-  const sorted=[...state.ideas].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
-  const count=$('#ideaCount');if(count)count.textContent=`아이디어 ${sorted.length}개`;
+  const active=state.ideas.filter(x=>!x.archived), archived=state.ideas.filter(x=>x.archived);
+  const ac=$('#ideaActiveCount'),rc=$('#ideaArchiveCount');
+  if(ac)ac.textContent=active.length;if(rc)rc.textContent=archived.length;
+  $$('#ideaTabs button').forEach(b=>b.classList.toggle('active',b.dataset.ideaView===ideaView));
+  const list=(ideaView==='archive'?archived:active).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   const grid=$('#ideaGrid');if(!grid)return;
-  grid.innerHTML=sorted.length?sorted.map(x=>{
+  grid.innerHTML=list.length?list.map(x=>{
     const c=memberColors[x.proposer]||{bg:'#f7f7f5',line:'#aaa'};
-    return `<article class="idea-card" style="--idea-bg:${c.bg};--idea-line:${c.line}" onclick="openModal('ideaModal','${x.id}')">
+    return `<article class="idea-card ${x.archived?'idea-archived':''}" style="--idea-bg:${c.bg};--idea-line:${c.line}" onclick="openModal('ideaModal','${x.id}')">
       <div class="idea-card-top"><span class="idea-proposer">${esc(x.proposer||'미정')} PD</span><small>${esc(x.createdAt||'')}</small></div>
       <h3>${esc(x.title||'제목 없음')}</h3>
       <p>${esc(x.content||'').replace(/\n/g,'<br>')}</p>
-      <div class="idea-card-bottom"><span>✦ IDEA</span><button type="button" onclick="event.stopPropagation();deleteById('ideas','${x.id}')">삭제</button></div>
+      <div class="idea-card-actions">
+        <button type="button" class="idea-archive-btn" onclick="event.stopPropagation();toggleIdeaArchive('${x.id}')">${x.archived?'↩ 다시 꺼내기':'보관'}</button>
+      </div>
+      <div class="idea-card-bottom"><span>✦ ${x.archived?'ARCHIVE':'IDEA'}</span><button type="button" onclick="event.stopPropagation();deleteById('ideas','${x.id}')">삭제</button></div>
     </article>`;
-  }).join(''):`<div class="idea-empty"><strong>아직 저장된 아이디어가 없어요.</strong><p>떠오르는 순간 바로 기록해보세요.</p><button class="accent-btn" onclick="openModal('ideaModal')">+ 첫 아이디어 작성</button></div>`;
+  }).join(''):`<div class="idea-empty"><strong>${ideaView==='archive'?'보관된 아이디어가 없어요.':'아직 저장된 아이디어가 없어요.'}</strong><p>${ideaView==='archive'?'아이디어 카드에서 보관을 누르면 이곳으로 이동해요.':'떠오르는 순간 바로 기록해보세요.'}</p>${ideaView==='active'?'<button class="accent-btn" onclick="openModal(\\'ideaModal\\')">+ 첫 아이디어 작성</button>':''}</div>`;
 }
+window.toggleIdeaArchive=id=>{const item=state.ideas.find(x=>x.id===id);if(!item)return;item.archived=!item.archived;save();};
+window.setIdeaView=view=>{ideaView=view;renderIdeas();};
 
 function renderResources(){$('#resourceGrid').innerHTML=state.resources.length?state.resources.map(x=>`<article class="tile"><div class="topline"><span class="status">${esc(x.category||'링크')}</span><button class="del" onclick="deleteById('resources','${x.id}')">삭제</button></div><h4><a href="${esc(x.url)}" target="_blank">${esc(x.name)} ↗</a></h4><p>${esc(x.url)}</p></article>`).join(''):'<div class="empty">등록된 리소스가 없어요.</div>';}
-function renderNotices(){$('#noticeList').innerHTML=state.notices.length?[...state.notices].reverse().map(x=>`<article class="doc"><div class="doc-head"><h4>${channelPill(x.channel)} &nbsp;${esc(x.title)}</h4><div><small>${esc(x.author)}</small> <button class="del" onclick="deleteById('notices','${x.id}')">삭제</button></div></div><p>${esc(x.content)}</p></article>`).join(''):'<div class="empty">공지사항이 없어요.</div>';}
+let noticeView='episode';
+function normalizeNotice(x){
+  return {
+    ...x,
+    board:x.board||x.type||'episode',
+    author:x.author||x.writer||'',
+    pinned:Boolean(x.pinned)
+  };
+}
+function renderNotices(){
+  state.notices=Array.isArray(state.notices)?state.notices.map(normalizeNotice):[];
+  $$('#noticeTabs button').forEach(b=>b.classList.toggle('active',b.dataset.noticeView===noticeView));
+  const list=[...state.notices].filter(x=>(x.board||'episode')===noticeView).sort((a,b)=>{
+    if(Boolean(a.pinned)!==Boolean(b.pinned))return Number(b.pinned)-Number(a.pinned);
+    return String(b.createdAt||b.date||'').localeCompare(String(a.createdAt||a.date||''));
+  });
+  const board=$('#noticeBoard'); if(!board)return;
+  if(!list.length){
+    board.innerHTML=`<div class="notice-empty">아직 공지가 없어요</div>`;
+    return;
+  }
+  board.innerHTML=list.map(x=>`<article class="notice-row ${x.pinned?'pinned':''}" onclick="openNoticeModal('${x.id}')">
+    <div class="notice-pin">${x.pinned?'📌':''}</div>
+    <div class="notice-main">
+      <div class="notice-title-line">
+        <strong>${esc(x.title||'제목 없음')}</strong>
+        ${x.pinned?'<span>상단 고정</span>':''}
+      </div>
+      <p>${esc(x.content||'').replace(/\n/g,'<br>')}</p>
+      <div class="notice-meta">${x.author?`<span>${esc(x.author)}</span>`:''}<span>${esc(x.createdAt||x.date||'')}</span></div>
+    </div>
+  </article>`).join('');
+}
+window.setNoticeView=view=>{noticeView=view;renderNotices();};
+function openNoticeModal(id=null){
+  const existing=id?state.notices.find(x=>x.id===id):null;
+  const vals=existing?normalizeNotice(existing):{board:noticeView,title:'',content:'',author:'',pinned:false};
+  $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal notice-compose-modal">
+    <div class="modal-head"><div><h3>공지 작성</h3></div><button class="icon-btn" id="closeModal">×</button></div>
+    <form id="noticeForm">
+      <div class="notice-form-body">
+        <label>게시판<select name="board">
+          <option value="episode" ${vals.board==='episode'?'selected':''}>🎬 에피소드 공지</option>
+          <option value="internal" ${vals.board==='internal'?'selected':''}>🔒 내부 공지</option>
+        </select></label>
+        <label>제목<input name="title" value="${esc(vals.title||'')}" placeholder="제목 입력" required></label>
+        <label>내용<textarea name="content" placeholder="내용 입력" required>${esc(vals.content||'')}</textarea></label>
+        <label>작성자<input name="author" value="${esc(vals.author||'')}" placeholder="이름"></label>
+        <label class="notice-pin-check"><input type="checkbox" name="pinned" ${vals.pinned?'checked':''}><span>상단 고정</span></label>
+      </div>
+      <div class="modal-actions">${existing?'<button type="button" class="danger-btn" id="deleteNotice">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button type="submit" class="notice-save-btn">저장</button></div>
+    </form>
+  </div></div>`;
+  $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
+  if(existing)$('#deleteNotice').onclick=()=>{deleteById('notices',existing.id);closeModal();};
+  $('#noticeForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target);const obj={board:fd.get('board'),title:fd.get('title').trim(),content:fd.get('content').trim(),author:fd.get('author').trim(),pinned:fd.get('pinned')==='on',createdAt:existing?.createdAt||localDate()};if(existing)Object.assign(existing,obj);else state.notices.push({id:uid(),...obj});save();noticeView=obj.board;closeModal();};
+}
+window.openNoticeModal=openNoticeModal;
+
 function renderAll(){renderHome();renderUploads();renderShoots();renderAds();renderIdeas();renderMeetingsLanding();renderResources();renderNotices();}
 window.deleteById=(key,id)=>{state[key]=state[key].filter(x=>x.id!==id);save();};
 
@@ -366,13 +524,16 @@ function openModal(name,id=null,preset={}){
   if(name==='uploadModal'){openUploadModal(id);return;}if(name==='shootModal'){openShootModal(id);return;}
   const d=modalDefs[name], existing=id?state[d.key].find(x=>x.id===id):null,values={...existing,...preset};
   const fields=d.fields.map(([n,l,t,opts])=>{const val=values[n]??'';let input=t==='select'?`<select name="${n}">${opts.map(o=>`<option value="${esc(o)}" ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select>`:t==='textarea'?`<textarea name="${n}">${esc(val)}</textarea>`:`<input name="${n}" type="${t}" value="${esc(val)}" />`;return `<label class="${t==='textarea'?'full':''}">${l}${input}</label>`;}).join('');
-  $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal"><div class="modal-head"><h3>${d.title}</h3><button class="icon-btn" id="closeModal">×</button></div><form id="modalForm"><div class="form-grid">${fields}</div><div class="modal-actions">${existing?`<button type="button" class="danger-btn" id="deleteModal">삭제</button>`:''}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div></form></div></div>`;
+  const modalTitle=(name==='todoModal'&&existing)?'업무 수정':d.title;
+  $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal"><div class="modal-head"><h3>${modalTitle}</h3><button class="icon-btn" id="closeModal">×</button></div><form id="modalForm"><div class="form-grid">${fields}</div><div class="modal-actions">${existing?`<button type="button" class="danger-btn" id="deleteModal">삭제</button>`:''}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div></form></div></div>`;
   $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;if(existing)$('#deleteModal').onclick=()=>{deleteById(d.key,existing.id);closeModal();};
-  $('#modalForm').onsubmit=e=>{e.preventDefault();let obj=Object.fromEntries(new FormData(e.target).entries());if(name==='meetingModal'&&!existing)obj.sections=meetingSectionDefs.map(x=>({...x,items:[]}));if(name==='ideaModal'&&!existing)obj.createdAt=localDate();if(existing){Object.assign(existing,obj);}else{obj.id=uid();state[d.key].push(obj);}save();closeModal();};
+  $('#modalForm').onsubmit=e=>{e.preventDefault();let obj=Object.fromEntries(new FormData(e.target).entries());if(name==='meetingModal'&&!existing)obj.sections=meetingSectionDefs.map(x=>({...x,items:[]}));if(name==='ideaModal'&&!existing){obj.createdAt=localDate();obj.archived=false;}if(existing){Object.assign(existing,obj);}else{obj.id=uid();state[d.key].push(obj);}save();closeModal();};
 }
 function closeModal(){$('#modalRoot').innerHTML='';}
-window.editItem=(key,id)=>openModal({uploads:'uploadModal',shoots:'shootModal',ads:'adModal',meetings:'meetingModal'}[key],id);
+window.editItem=(key,id)=>openModal({todos:'todoModal',uploads:'uploadModal',shoots:'shootModal',ads:'adModal',meetings:'meetingModal'}[key],id);
 window.openModal=openModal;
+document.addEventListener('click',e=>{const b=e.target.closest('[data-idea-view]');if(b){window.setIdeaView(b.dataset.ideaView);}});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-notice-view]');if(b){window.setNoticeView(b.dataset.noticeView);}});
 $('#globalSearch').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();$$('.member-card,.tile,.doc,.simple-row,.upload-card,.shoot-card,.ad-row,.idea-card').forEach(el=>el.style.display=!q||el.textContent.toLowerCase().includes(q)?'':'none');});
 $('#exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='우리팀-잘-굴러가유-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);};
 $('#todayLabel').textContent=new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date());
