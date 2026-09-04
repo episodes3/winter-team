@@ -9,8 +9,8 @@ const meetingSectionDefs=[
   {title:'📣 공지사항',tone:'notice'},
   {title:'💡 아이템 논의',tone:'idea'},
   {title:'🧥 주우재',tone:'joo'},
-  {title:'💄 이혜영',tone:'hye'},
-  {title:'🥁 도운',tone:'dow'},
+  {title:'👗 이혜영',tone:'hye'},
+  {title:'🐶 도운',tone:'dow'},
   {title:'💬 기타',tone:'etc'}
 ];
 const memberColors={
