@@ -749,3 +749,8 @@
 }
 .timeline-bar.joo{background:#67a9df !important}
 .resource-channel.joo{background:#e8f2ff !important;color:#4f82b8 !important}
+
+/* V3.48 smaller meeting add-item label */
+.meeting-add-btn{
+  font-size:9px !important;
+}
