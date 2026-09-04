@@ -91,7 +91,7 @@ function navigate(id){$$('#nav button').forEach(b=>b.classList.toggle('active',b
 function renderHome(){
   const now=new Date(),tom=new Date();tom.setDate(now.getDate()+1);const weekEnd=new Date();weekEnd.setDate(now.getDate()+7);const td=localDate(now),tm=localDate(tom);
   const scheduleItems=[...state.schedules.map(x=>({...x,kind:'일정'})),...state.shoots.map(x=>({...x,kind:'촬영'})),...state.uploads.map(x=>({...x,kind:'업로드'}))];
-  const renderSchedule=(arr,msg)=>arr.length?arr.slice(0,5).map(x=>`<div class="schedule-item ${channelClass[x.channel]||''}"><span class="bar"></span><div><strong>${esc(x.title)}</strong><small>${esc(x.channel||'전체')} · ${esc(x.kind)}</small></div><time>${fmtDate(x.date)}</time></div>`).join(''):`<div class="empty">${msg}</div>`;
+  const renderSchedule=(arr,msg)=>arr.length?arr.slice(0,5).map(x=>`<div class="schedule-item ${channelClass[x.channel]||''}"><span class="bar"></span><div><strong>${esc(x.title)}</strong><small>${esc(x.channel||'전체')} · ${esc(x.kind)}</small></div><time>${shootDates(x).map(d=>fmtDate(d.date)+(d.memo?` ${esc(d.memo)}`:'')).join(' · ')||'-'}</time></div>`).join(''):`<div class="empty">${msg}</div>`;
   const today=scheduleItems.filter(x=>x.date===td), tomorrow=scheduleItems.filter(x=>x.date===tm), week=state.uploads.filter(x=>x.date&&new Date(x.date+'T00:00:00')>=new Date(td+'T00:00:00')&&new Date(x.date+'T00:00:00')<=weekEnd).sort((a,b)=>a.date.localeCompare(b.date));
   $('#todayCount').textContent=today.length;$('#tomorrowCount').textContent=tomorrow.length;$('#weekCount').textContent=week.length;
   $('#todaySchedule').innerHTML=renderSchedule(today,'오늘 일정이 없어요');$('#tomorrowSchedule').innerHTML=renderSchedule(tomorrow,'예정된 일정이 없어요');$('#weekUploads').innerHTML=renderSchedule(week.map(x=>({...x,kind:'업로드'})),'이번 주 업로드가 없어요');
@@ -155,6 +155,10 @@ window.openUploadModal=openUploadModal;
 
 let shootVisibleCounts=Object.fromEntries(channels.map(ch=>[ch,10]));
 
+function shootDates(x){
+  if(Array.isArray(x.dates)&&x.dates.length)return x.dates.map(d=>typeof d==='string'?{date:d,memo:''}:d).filter(d=>d.date);
+  return x.date?[{date:x.date,memo:x.dateMemo||''}]:[];
+}
 function shootMembers(x){
   if(Array.isArray(x.members))return x.members;
   const legacy=[...(x.assignee?[x.assignee]:[]),...String(x.crew||'').split(',').map(v=>v.trim()).filter(v=>members.includes(v))];
@@ -162,15 +166,16 @@ function shootMembers(x){
 }
 function openShootModal(id=null){
   const existing=id?state.shoots.find(x=>x.id===id):null;
-  const vals=existing||{channel:channels[0],title:'',date:localDate(),members:[],selfCam:false,crew:'',method:'PD 자체 촬영',notes:''};
-  const selected=shootMembers(vals);
+  const vals=existing||{channel:channels[0],title:'',date:localDate(),dates:[{date:localDate(),memo:''}],members:[],selfCam:false,crew:'',method:'PD 자체 촬영',notes:''};
+  const selected=shootMembers(vals),dates=shootDates(vals);
+  const dateRows=(dates.length?dates:[{date:localDate(),memo:''}]).map((d,i)=>`<div class="shoot-date-row" data-shoot-date-row><input type="date" name="shootDate" value="${esc(d.date||'')}"><input name="shootDateMemo" value="${esc(d.memo||'')}" placeholder="메모 (선택)"><button type="button" class="shoot-date-remove" title="촬영일 삭제">×</button></div>`).join('');
   $('#modalRoot').innerHTML=`<div class="modal-backdrop shoot-modal-backdrop"><div class="modal shoot-preset-modal">
     <div class="modal-head"><div><small>${existing?'촬영 수정':'촬영 추가'}</small><h3>${existing?esc(vals.title||'촬영 정보'):'새 촬영 등록'}</h3></div><button class="icon-btn" id="closeModal">×</button></div>
     <form id="shootPresetForm">
       <div class="shoot-preset-body">
         <label class="shoot-field">채널<select name="channel">${channels.map(ch=>`<option ${ch===vals.channel?'selected':''}>${ch}</option>`).join('')}</select></label>
         <label class="shoot-field">영상 / 촬영 제목<input name="title" value="${esc(vals.title||'')}" placeholder="촬영 제목을 입력하세요" required></label>
-        <div class="shoot-field"><span>📅 촬영일</span><div class="shoot-date-row"><input type="date" name="date" value="${esc(vals.date||'')}"><input name="dateMemo" value="${esc(vals.dateMemo||'')}" placeholder="메모 (선택)"></div></div>
+        <div class="shoot-field"><span>📅 촬영일</span><div id="shootDateRows" class="shoot-date-rows">${dateRows}</div><button type="button" class="shoot-date-add" id="addShootDate">+ 촬영일 추가</button></div>
         <div class="shoot-field"><span>📋 촬영 멤버</span><div class="shoot-member-chips">${members.map(m=>`<label><input type="checkbox" name="members" value="${m}" ${selected.includes(m)?'checked':''}><span>${m}</span></label>`).join('')}<label class="selfcam-chip"><input type="checkbox" name="selfCam" ${vals.selfCam||vals.method==='셀프캠'?'checked':''}><span>셀프캠</span></label></div></div>
         <label class="shoot-field">🎥 촬영팀<input name="crew" value="${esc(vals.crew||'')}" placeholder="예: 해리, 듀크, 외주1"></label>
         <div class="shoot-field"><span>촬영 방식</span><div class="shoot-method-options">${['장비불출 (PD 자체 촬영)','촬영팀 동행','해당없음 (셀프캠)'].map((t,i)=>{const value=i===0?'PD 자체 촬영':i===1?'촬영팀 동행':'셀프캠';return `<label><input type="radio" name="method" value="${value}" ${value===(vals.method||'PD 자체 촬영')?'checked':''}><span>${i===0?'🎒':i===1?'📹':'🦿'} ${t}</span></label>`}).join('')}</div></div>
@@ -181,9 +186,14 @@ function openShootModal(id=null){
   </div></div>`;
   $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
   if(existing)$('#deleteShoot').onclick=()=>{deleteById('shoots',existing.id);closeModal();};
+  const bindShootDateRows=()=>{$$('[data-shoot-date-row]').forEach(row=>{const btn=row.querySelector('.shoot-date-remove');if(btn)btn.onclick=()=>{const rows=$$('[data-shoot-date-row]');if(rows.length===1){row.querySelector('input[type="date"]').value='';row.querySelector('input[name="shootDateMemo"]').value='';return;}row.remove();};});};
+  bindShootDateRows();
+  $('#addShootDate').onclick=()=>{const box=$('#shootDateRows'),row=document.createElement('div');row.className='shoot-date-row';row.setAttribute('data-shoot-date-row','');row.innerHTML=`<input type="date" name="shootDate"><input name="shootDateMemo" placeholder="메모 (선택)"><button type="button" class="shoot-date-remove" title="촬영일 삭제">×</button>`;box.appendChild(row);bindShootDateRows();};
+  const crewInput=document.querySelector('input[name="crew"]');
+  crewInput?.addEventListener('input',()=>{if(crewInput.value.trim()){const r=document.querySelector('input[name="method"][value="촬영팀 동행"]');if(r)r.checked=true;}});
   const selfCb=document.querySelector('input[name="selfCam"]');
   selfCb?.addEventListener('change',()=>{if(selfCb.checked){const r=document.querySelector('input[name="method"][value="셀프캠"]');if(r)r.checked=true;}});
-  $('#shootPresetForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),selectedMembers=fd.getAll('members'),selfCam=fd.get('selfCam')==='on';const obj={channel:fd.get('channel'),title:fd.get('title').trim(),date:fd.get('date'),dateMemo:fd.get('dateMemo')||'',members:selectedMembers,selfCam,assignee:selectedMembers[0]||'',crew:fd.get('crew')||'',method:selfCam?'셀프캠':fd.get('method'),notes:fd.get('notes')||'',equipment:''};if(existing)Object.assign(existing,obj);else state.shoots.push({id:uid(),...obj});save();closeModal();};
+  $('#shootPresetForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),selectedMembers=fd.getAll('members'),selfCam=fd.get('selfCam')==='on';const dateInputs=$$('input[name="shootDate"]'),memoInputs=$$('input[name="shootDateMemo"]'),dates=dateInputs.map((el,i)=>({date:el.value,memo:memoInputs[i]?.value||''})).filter(x=>x.date);const firstDate=dates[0]||{date:'',memo:''};const obj={channel:fd.get('channel'),title:fd.get('title').trim(),date:firstDate.date,dateMemo:firstDate.memo,dates,members:selectedMembers,selfCam,assignee:selectedMembers[0]||'',crew:fd.get('crew')||'',method:selfCam?'셀프캠':fd.get('method'),notes:fd.get('notes')||'',equipment:''};if(existing)Object.assign(existing,obj);else state.shoots.push({id:uid(),...obj});save();closeModal();};
 }
 window.openShootModal=openShootModal;
 
@@ -193,7 +203,7 @@ function renderShoots(){
   $('#shootColumns').innerHTML=channels.map(ch=>{
     const arr=state.shoots.filter(x=>x.channel===ch).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     const limit=shootVisibleCounts[ch]||10,shown=arr.slice(0,limit),remain=Math.max(0,arr.length-limit),next=Math.min(10,remain);
-    const cards=shown.length?shown.map(x=>`<article class="shoot-card ${channelClass[ch]}" onclick="editItem('shoots','${x.id}')"><div class="shoot-card-head"><h4>${esc(x.title)}</h4><time>${fmtDate(x.date)}</time></div><div class="crew-chips">${(x.members||[]).map(n=>`<span>${esc(n)}</span>`).join('')}${x.selfCam?'<span>셀프캠</span>':''}</div>${x.crew?`<small>🎥 ${esc(x.crew)}</small>`:''}<small>${esc(x.method||'촬영 방식 미정')}</small>${x.notes?`<em>${esc(x.notes)}</em>`:''}</article>`).join(''):'<div class="empty">등록된 촬영이 없어요.</div>';
+    const cards=shown.length?shown.map(x=>`<article class="shoot-card ${channelClass[ch]}" onclick="editItem('shoots','${x.id}')"><div class="shoot-card-head"><h4>${esc(x.title)}</h4><time>${shootDates(x).map(d=>fmtDate(d.date)+(d.memo?` ${esc(d.memo)}`:'')).join(' · ')||'-'}</time></div><div class="crew-chips">${(x.members||[]).map(n=>`<span>${esc(n)}</span>`).join('')}${x.selfCam?'<span>셀프캠</span>':''}</div>${x.crew?`<small>🎥 ${esc(x.crew)}</small>`:''}<small>${esc(x.method||'촬영 방식 미정')}</small>${x.notes?`<em>${esc(x.notes)}</em>`:''}</article>`).join(''):'<div class="empty">등록된 촬영이 없어요.</div>';
     return `<section class="channel-col"><h3>${channelPill(ch)}</h3><p>촬영 ${arr.length}건</p><div class="shoot-list">${cards}</div>${remain?`<button class="shoot-more-btn" onclick="showMoreShoots('${ch}')">지난 촬영 ${next}건 펼치기 <span>↓</span></button>`:''}</section>`;
   }).join('');
 }

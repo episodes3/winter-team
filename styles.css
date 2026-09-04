@@ -171,3 +171,10 @@
 .shoot-method-options{display:flex;flex-direction:column;gap:8px}.shoot-method-options label{cursor:pointer}.shoot-method-options input{display:none}.shoot-method-options span{display:block;padding:12px 14px;border:1px solid transparent;border-radius:9px;font-size:12px;font-weight:600}.shoot-method-options input:checked+span{background:#f1f6df;border-color:#dce9b9;color:#39451f}
 .shoot-more-btn{width:100%;margin-top:12px;padding:11px;border:1px dashed #d4d4d0;border-radius:9px;background:#fafaf8;color:#777;font-size:11px;font-weight:700;cursor:pointer}.shoot-more-btn:hover{background:#f3f3ef;color:#444}.shoot-more-btn span{margin-left:4px}
 @media(max-width:650px){.shoot-date-row{grid-template-columns:1fr}}
+
+/* Multiple shoot dates V3.9 */
+.shoot-date-rows{display:flex;flex-direction:column;gap:8px}
+.shoot-date-row{grid-template-columns:1fr 1.35fr 34px}
+.shoot-date-remove{width:34px;border:0;background:transparent;color:#aaa;font-size:20px;cursor:pointer}.shoot-date-remove:hover{color:#d45d5d}
+.shoot-date-add{width:100%;padding:10px;border:1px dashed #d3d3cf;border-radius:9px;background:#fafaf8;color:#555;font-size:11px;font-weight:700;cursor:pointer}.shoot-date-add:hover{background:#f3f4ed;border-color:#bdcf8e}
+@media(max-width:650px){.shoot-date-row{grid-template-columns:1fr}.shoot-date-remove{width:100%;height:28px}}
