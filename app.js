@@ -303,7 +303,37 @@ function openUploadModal(id=null){
     <label class="full">메모 (선택)<textarea name="memo" placeholder="추가 메모가 있다면 입력하세요!">${esc(vals.memo||'')}</textarea></label>
   </div><div class="modal-actions upload-actions">${existing?'<button type="button" class="danger-btn" id="deleteUpload">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div></form></div></div>`;
   $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
-  $$('input[name="assignees"]').forEach(cb=>cb.addEventListener('change',()=>{const box=document.querySelector(`[data-range="${cb.value}"]`);box.classList.toggle('disabled',!cb.checked);}));
+
+  const uploadDateInput=document.querySelector('#uploadEditForm input[name="date"]');
+  const autoEditRangeFromUploadDate=(member,force=false)=>{
+    if(existing||!uploadDateInput?.value)return;
+    const startInput=document.querySelector(`[data-start="${member}"]`);
+    const endInput=document.querySelector(`[data-end="${member}"]`);
+    if(!startInput||!endInput)return;
+    const endDate=new Date(`${uploadDateInput.value}T00:00:00`);
+    if(Number.isNaN(endDate.getTime()))return;
+    const startDate=new Date(endDate);
+    startDate.setDate(startDate.getDate()-14);
+    const toLocalDateString=d=>{
+      const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+      return `${y}-${m}-${day}`;
+    };
+    if(force||!startInput.value)startInput.value=toLocalDateString(startDate);
+    if(force||!endInput.value)endInput.value=uploadDateInput.value;
+  };
+
+  $$('input[name="assignees"]').forEach(cb=>cb.addEventListener('change',()=>{
+    const box=document.querySelector(`[data-range="${cb.value}"]`);
+    box.classList.toggle('disabled',!cb.checked);
+    if(cb.checked)autoEditRangeFromUploadDate(cb.value,false);
+  }));
+
+  if(!existing){
+    uploadDateInput?.addEventListener('change',()=>{
+      $$('input[name="assignees"]:checked').forEach(cb=>autoEditRangeFromUploadDate(cb.value,true));
+    });
+  }
+
   const adVideoCb=document.querySelector('input[name="sevenNeed"]'),firstDraftField=$('#firstDraftDateField'),adLinkField=$('#uploadAdLinkField'),adSelect=$('#uploadAdSelect'),channelSelect=$('#uploadChannelSelect');
   adVideoCb?.addEventListener('change',()=>{const on=adVideoCb.checked;firstDraftField.classList.toggle('hidden',!on);adLinkField.classList.toggle('hidden',!on);if(!on){firstDraftField.querySelector('input').value='';adSelect.value='';}});
   channelSelect?.addEventListener('change',()=>{adSelect.innerHTML=adOptions(channelSelect.value,adSelect.value);});
