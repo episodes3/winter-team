@@ -571,3 +571,80 @@
 .compact-action-modal .modal-actions .danger-btn{
   margin-right:auto !important;
 }
+
+/* V3.35 ad classification/status color tags */
+.ad-type,.ad-status-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:max-content;
+  white-space:nowrap;
+  border:0 !important;
+  font-weight:800;
+}
+.ad-type{padding:3px 7px;border-radius:6px;font-size:8px}
+.ad-type-bdc{background:#e8efff!important;color:#49639b!important}
+.ad-type-planned{background:#f2eafa!important;color:#76598f!important}
+.ad-type-simple{background:#fff0dc!important;color:#9a6a2f!important}
+.ad-type-shorts{background:#e5f4ed!important;color:#47745f!important}
+.ad-type-legacy{background:#f1f1ef!important;color:#777!important}
+
+.ad-status-badge{padding:4px 8px;border-radius:7px;font-size:8px}
+.ad-status-internal{background:#f1f1ef;color:#686868}
+.ad-status-agency{background:#fff1c9;color:#8a681e}
+.ad-status-proposal{background:#e8efff;color:#4d6395}
+.ad-status-shot{background:#f1e8fa;color:#75578f}
+.ad-status-uploaded{background:#e4f2df;color:#4d7043}
+.ad-status-legacy{background:#f1f1ef;color:#777}
+
+/* V3.36 resource memo accordion */
+.resource-memo-title-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.resource-memo-title-row h4{
+  margin:0 !important;
+}
+.resource-memo-toggle{
+  flex:0 0 auto;
+  width:20px;
+  height:20px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #dedfda;
+  border-radius:6px;
+  background:#fafaf8;
+  color:#777;
+  font-size:12px;
+  line-height:1;
+}
+.resource-memo-card .resource-memo-preview{
+  display:none;
+  max-height:none !important;
+  overflow:visible !important;
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px solid #efefeb;
+}
+.resource-memo-card.active{
+  background:#fbfcf8;
+}
+.resource-memo-card.active .resource-memo-preview{
+  display:block;
+}
+.resource-memo-card.active .resource-memo-toggle{
+  background:#edf3df;
+  border-color:#d8e3bc;
+  color:#5c6f3d;
+}
+
+/* V3.37 stable resource memo bold control */
+.resource-rich-toolbar button.active,
+.resource-rich-toolbar button[aria-pressed="true"]{
+  background:#e8f0d8 !important;
+  border-color:#cbdba7 !important;
+  color:#405622 !important;
+}

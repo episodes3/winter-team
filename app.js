@@ -378,8 +378,18 @@ function formatAdMoney(v){
   if(n>=100000000)return `${(n/100000000).toFixed(n%100000000===0?0:1)}억원`;
   return `${Math.round(n/10000).toLocaleString()}만원`;
 }
+function adTypeBadge(type){
+  const v=type||'BDC';
+  const cls={'BDC':'bdc','기획PPL':'planned','단순PPL':'simple','쇼츠':'shorts'}[v]||'legacy';
+  return `<span class="ad-type ad-type-${cls}">${esc(v)}</span>`;
+}
+function adStatusBadge(status){
+  const v=status||'내부 논의중';
+  const cls={'내부 논의중':'internal','소속사 논의중':'agency','구성안 작성중':'proposal','촬영 완료':'shot','업로드 완료':'uploaded'}[v]||'legacy';
+  return `<span class="ad-status-badge ad-status-${cls}">${esc(v)}</span>`;
+}
 function renderAds(){
-  $('#adColumns').innerHTML=channels.map(ch=>{const arr=state.ads.filter(x=>x.channel===ch);return `<section class="channel-col ad-col"><h3>${channelPill(ch)}</h3><div>${arr.length?arr.map(x=>`<article class="ad-row ${channelClass[ch]}" onclick="editItem('ads','${x.id}')"><div><span class="ad-type">${esc(x.adType||'BDC')}</span><b>${esc(x.brand)}</b><small>${esc(x.month||currentYM())}</small></div>${statusBadge(x.status)}</article>`).join(''):'<div class="empty">등록된 광고가 없어요.</div>'}</div></section>`}).join('');
+  $('#adColumns').innerHTML=channels.map(ch=>{const arr=state.ads.filter(x=>x.channel===ch);return `<section class="channel-col ad-col"><h3>${channelPill(ch)}</h3><div>${arr.length?arr.map(x=>`<article class="ad-row ${channelClass[ch]}" onclick="editItem('ads','${x.id}')"><div>${adTypeBadge(x.adType)}<b>${esc(x.brand)}</b><small>${esc(x.month||currentYM())}</small></div>${adStatusBadge(x.status)}</article>`).join(''):'<div class="empty">등록된 광고가 없어요.</div>'}</div></section>`}).join('');
   state.adTargets=state.adTargets||{};
   $('#adKpi').innerHTML=channels.map(ch=>{
     const arr=state.ads.filter(x=>x.channel===ch),amt=arr.reduce((s,x)=>s+Number(x.amount||0),0);
@@ -768,34 +778,84 @@ function resourceMemoText(html){
   const box=document.createElement('div');box.innerHTML=String(html||'');
   return (box.innerText||box.textContent||'').trim();
 }
+let activeResourceMemoId=null;
 function renderResourceMemos(){
   const wrap=$('#resourceMemoList');if(!wrap)return;
   state.resourceMemos=Array.isArray(state.resourceMemos)?state.resourceMemos:[];
-  wrap.innerHTML=state.resourceMemos.length?state.resourceMemos.map(x=>`<article class="resource-memo-card">
-    <div class="resource-memo-card-main" onclick="openResourceMemoModal('${x.id}')">
-      <h4>${esc(x.title||'제목 없음')}</h4>
-      <div class="resource-memo-preview">${sanitizeResourceMemoHtml(x.html||esc(x.text||''))}</div>
-    </div>
-    <div class="resource-memo-actions">
-      <button onclick="openResourceMemoModal('${x.id}')">✎ 수정</button>
-      <button class="delete" onclick="deleteResourceMemo('${x.id}')">삭제</button>
-    </div>
-  </article>`).join(''):`<div class="resource-memo-empty">등록된 메모가 없어요.</div>`;
+  wrap.innerHTML=state.resourceMemos.length?state.resourceMemos.map(x=>{
+    const active=activeResourceMemoId===x.id;
+    return `<article class="resource-memo-card ${active?'active':''}">
+      <div class="resource-memo-card-main" onclick="toggleResourceMemo('${x.id}')">
+        <div class="resource-memo-title-row">
+          <h4>${esc(x.title||'제목 없음')}</h4>
+          <span class="resource-memo-toggle">${active?'−':'+'}</span>
+        </div>
+        <div class="resource-memo-preview">${sanitizeResourceMemoHtml(x.html||esc(x.text||''))}</div>
+      </div>
+      <div class="resource-memo-actions">
+        <button onclick="event.stopPropagation();openResourceMemoModal('${x.id}')">✎ 수정</button>
+        <button class="delete" onclick="event.stopPropagation();deleteResourceMemo('${x.id}')">삭제</button>
+      </div>
+    </article>`;
+  }).join(''):`<div class="resource-memo-empty">등록된 메모가 없어요.</div>`;
 }
-window.deleteResourceMemo=id=>{state.resourceMemos=state.resourceMemos.filter(x=>x.id!==id);save();};
+window.toggleResourceMemo=id=>{
+  activeResourceMemoId=activeResourceMemoId===id?null:id;
+  renderResourceMemos();
+};
+window.deleteResourceMemo=id=>{state.resourceMemos=state.resourceMemos.filter(x=>x.id!==id);if(activeResourceMemoId===id)activeResourceMemoId=null;save();};
 
+let resourceMemoSavedRange=null;
+function saveResourceMemoSelection(){
+  const editor=$('#resourceMemoEditor');
+  const sel=window.getSelection();
+  if(!editor||!sel||!sel.rangeCount)return;
+  const range=sel.getRangeAt(0);
+  const node=range.commonAncestorContainer;
+  if(editor===node||editor.contains(node)){
+    resourceMemoSavedRange=range.cloneRange();
+  }
+  updateResourceMemoToolbar();
+}
+function restoreResourceMemoSelection(){
+  if(!resourceMemoSavedRange)return false;
+  const editor=$('#resourceMemoEditor');if(!editor)return false;
+  const sel=window.getSelection();if(!sel)return false;
+  try{
+    sel.removeAllRanges();
+    sel.addRange(resourceMemoSavedRange);
+    return true;
+  }catch{return false;}
+}
+function updateResourceMemoToolbar(){
+  const editor=$('#resourceMemoEditor');
+  const boldBtn=$('#resourceMemoBoldBtn');
+  if(!editor||!boldBtn)return;
+  let active=false;
+  try{
+    const sel=window.getSelection();
+    if(sel&&sel.rangeCount){
+      const node=sel.getRangeAt(0).commonAncestorContainer;
+      if(editor===node||editor.contains(node))active=document.queryCommandState('bold');
+    }
+  }catch{}
+  boldBtn.classList.toggle('active',!!active);
+  boldBtn.setAttribute('aria-pressed',active?'true':'false');
+}
 function applyResourceMemoFormat(cmd,value=null){
   const editor=$('#resourceMemoEditor');if(!editor)return;
-  editor.focus();
+  editor.focus({preventScroll:true});
+  restoreResourceMemoSelection();
 
   if(cmd==='bold'||cmd==='italic'||cmd==='underline'||cmd==='insertUnorderedList'){
-    document.execCommand(cmd,false,null);
+    try{document.execCommand(cmd,false,null);}catch{}
+    saveResourceMemoSelection();
+    updateResourceMemoToolbar();
     return;
   }
   if(cmd==='size'){
     const sel=window.getSelection();
-    if(!sel||!sel.rangeCount)return;
-    if(sel.isCollapsed)return;
+    if(!sel||!sel.rangeCount||sel.isCollapsed)return;
     const range=sel.getRangeAt(0);
     const span=document.createElement('span');
     span.dataset.size=value||'normal';
@@ -806,6 +866,8 @@ function applyResourceMemoFormat(cmd,value=null){
     }
     sel.removeAllRanges();
     const r=document.createRange();r.selectNodeContents(span);sel.addRange(r);
+    resourceMemoSavedRange=r.cloneRange();
+    updateResourceMemoToolbar();
   }
 }
 window.applyResourceMemoFormat=applyResourceMemoFormat;
@@ -823,7 +885,7 @@ function openResourceMemoModal(id=null){
         <label>내용
           <div class="resource-rich-editor">
             <div class="resource-rich-toolbar">
-              <button type="button" onmousedown="event.preventDefault();applyResourceMemoFormat('bold')"><b>B</b></button>
+              <button type="button" id="resourceMemoBoldBtn" aria-pressed="false" onmousedown="event.preventDefault();applyResourceMemoFormat('bold')"><b>B</b></button>
               <button type="button" onmousedown="event.preventDefault();applyResourceMemoFormat('italic')"><i>I</i></button>
               <button type="button" onmousedown="event.preventDefault();applyResourceMemoFormat('underline')"><u>U</u></button>
               <span class="toolbar-sep"></span>
@@ -854,7 +916,16 @@ function openResourceMemoModal(id=null){
     else state.resourceMemos.push({id:uid(),title,html,text,createdAt:new Date().toISOString()});
     save();closeModal();
   };
-  setTimeout(()=>$('#resourceMemoEditor')?.focus(),0);
+  const memoEditor=$('#resourceMemoEditor');
+  if(memoEditor){
+    ['keyup','mouseup','input','focus'].forEach(evt=>memoEditor.addEventListener(evt,saveResourceMemoSelection));
+    document.addEventListener('selectionchange',saveResourceMemoSelection,{once:false});
+  }
+  resourceMemoSavedRange=null;
+  setTimeout(()=>{
+    memoEditor?.focus();
+    saveResourceMemoSelection();
+  },0);
 }
 window.openResourceMemoModal=openResourceMemoModal;
 let noticeView='episode';
