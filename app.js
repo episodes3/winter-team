@@ -1249,7 +1249,7 @@ function showDeleteUndo(message='삭제되었습니다',restoreFn){
     deleteUndoAction=null;
     deleteUndoTimer=null;
     setTimeout(()=>toast.remove(),220);
-  },8000);
+  },4000);
 }
 window.undoLastDelete=()=>{
   if(!deleteUndoAction)return;
