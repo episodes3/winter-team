@@ -25,6 +25,7 @@
       <div class="brand"><span>🎬</span><strong>우리팀<br>잘 굴러가유</strong></div>
       <nav id="nav" class="nav">
         <button class="active" data-page="home"><span>⌂</span> 홈</button>
+        <button data-page="calendar"><span>▦</span> 캘린더</button>
         <button data-page="ideas"><span>✦</span> 아이디어 보관함</button>
         <button data-page="meetings"><span>✎</span> 회의</button>
         <button data-page="uploads"><span>▷</span> 업로드 스케줄</button>
@@ -69,6 +70,35 @@
           <section><div class="home-row-head compact"><div><h3>다가오는 촬영</h3></div><button class="text-btn" data-open="shootModal">+ 추가</button></div><div id="homeShoots" class="simple-list"></div></section>
           <section><div class="home-row-head compact"><div><h3>공지</h3></div><button class="text-btn" data-open="noticeModal">+ 작성</button></div><div id="homeNotices" class="simple-list"></div></section>
         </div>
+      </section>
+
+      <section id="calendar" class="page">
+        <div class="calendar-page-head">
+          <div class="calendar-title-row">
+            <h1>캘린더</h1>
+            <button class="calendar-nav-btn" onclick="moveCalendarMonth(-1)">‹</button>
+            <strong id="calendarMonthLabel"></strong>
+            <button class="calendar-nav-btn" onclick="moveCalendarMonth(1)">›</button>
+            <button class="calendar-today-btn" onclick="goCalendarToday()">오늘</button>
+          </div>
+          <button class="calendar-add-btn" onclick="openCalendarEventModal()">일정 추가</button>
+        </div>
+
+        <div class="calendar-legend">
+          <span><i class="legend-dot upload"></i>업로드(자동)</span>
+          <span><i class="legend-dot shoot"></i>촬영(자동)</span>
+          <span><i class="legend-dot meeting"></i>회의</span>
+          <span><i class="legend-dot leave"></i>연차</span>
+          <span><i class="legend-dot manual"></i>기타 일정</span>
+        </div>
+
+        <div class="calendar-shell">
+          <div class="calendar-weekdays">
+            <div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div>
+          </div>
+          <div id="calendarGrid" class="calendar-grid"></div>
+        </div>
+        <p class="calendar-help">빈 날짜를 클릭하면 일정을 추가하고, 등록된 일정을 클릭하면 수정할 수 있어요. 업로드·촬영 일정은 기존 탭과 자동 연동돼요.</p>
       </section>
 
       <section id="ideas" class="page">

@@ -94,7 +94,7 @@ function workBadge(s){return `<span class="work-dot ${s}"></span>${esc(s)}`;}
 $('#loginForm').addEventListener('submit',e=>{e.preventDefault();if($('#passwordInput').value===PASSWORD){sessionStorage.setItem('dashAuth','1');$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');}else $('#loginError').textContent='비밀번호가 틀렸어요.';});
 if(sessionStorage.getItem('dashAuth')==='1'){$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');}
 $$('#nav button').forEach(btn=>btn.addEventListener('click',()=>navigate(btn.dataset.page)));
-function navigate(id){$$('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));$$('.page').forEach(p=>p.classList.toggle('active-page',p.id===id));if(id==='meetings'){const n=new Date(),week=String(Math.min(5,Math.ceil(n.getDate()/7)));renderMeetingMonth(n.getFullYear(),n.getMonth()+1,week);}window.scrollTo({top:0,behavior:'instant'});}
+function navigate(id){$$('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));$$('.page').forEach(p=>p.classList.toggle('active-page',p.id===id));if(id==='meetings'){const n=new Date(),week=String(Math.min(5,Math.ceil(n.getDate()/7)));renderMeetingMonth(n.getFullYear(),n.getMonth()+1,week);}if(id==='calendar')renderCalendar();window.scrollTo({top:0,behavior:'instant'});}
 
 function renderHome(){
   const now=new Date(),tom=new Date();tom.setDate(now.getDate()+1);const weekEnd=new Date();weekEnd.setDate(now.getDate()+7);const td=localDate(now),tm=localDate(tom);
@@ -535,7 +535,107 @@ function openNoticeModal(id=null){
 }
 window.openNoticeModal=openNoticeModal;
 
-function renderAll(){renderHome();renderUploads();renderShoots();renderAds();renderIdeas();renderMeetingsLanding();renderResources();renderNotices();}
+
+let calendarCursor=new Date();
+calendarCursor=new Date(calendarCursor.getFullYear(),calendarCursor.getMonth(),1);
+
+function calendarManualType(x){
+  if(x.type==='leave'||x.isLeave)return 'leave';
+  if(x.type==='meeting')return 'meeting';
+  return 'manual';
+}
+function calendarEvents(){
+  const manual=(state.schedules||[]).filter(x=>x.date).map(x=>({
+    id:x.id,source:'manual',date:x.date,title:x.title||'일정',type:calendarManualType(x),member:x.member||x.assignee||'',raw:x
+  }));
+  const uploads=(state.uploads||[]).filter(x=>x.date).map(x=>({
+    id:x.id,source:'upload',date:x.date,title:x.title||'업로드',type:'upload',raw:x
+  }));
+  const shoots=[];
+  (state.shoots||[]).forEach(x=>{
+    const pd=shootMembers(x);
+    const suffix=pd.length?` (${pd.join(', ')})`:'';
+    shootDates(x).forEach((d,i)=>{
+      if(d.date)shoots.push({id:x.id,source:'shoot',date:d.date,title:(x.title||'촬영')+suffix,type:'shoot',raw:x,dateIndex:i});
+    });
+  });
+  return [...manual,...uploads,...shoots];
+}
+function renderCalendar(){
+  const grid=$('#calendarGrid'),label=$('#calendarMonthLabel');if(!grid||!label)return;
+  const y=calendarCursor.getFullYear(),m=calendarCursor.getMonth();
+  label.textContent=`${y}년 ${m+1}월`;
+  const first=new Date(y,m,1),start=new Date(y,m,1-first.getDay());
+  const today=localDate();
+  const events=calendarEvents();
+  const cells=[];
+  for(let i=0;i<42;i++){
+    const d=new Date(start);d.setDate(start.getDate()+i);
+    const iso=localDate(d),inMonth=d.getMonth()===m,dow=d.getDay();
+    const dayEvents=events.filter(e=>e.date===iso);
+    cells.push(`<div class="calendar-cell ${inMonth?'':'outside'} ${iso===today?'today':''}" onclick="openCalendarEventModal(null,'${iso}')">
+      <div class="calendar-day-number ${dow===0?'sun':''} ${dow===6?'sat':''}">${d.getDate()}${iso===today?'<span>오늘</span>':''}</div>
+      <div class="calendar-events">${dayEvents.slice(0,5).map(e=>calendarEventHTML(e)).join('')}${dayEvents.length>5?`<button class="calendar-more" onclick="event.stopPropagation()">+${dayEvents.length-5}개 더</button>`:''}</div>
+    </div>`);
+  }
+  grid.innerHTML=cells.join('');
+}
+function calendarEventHTML(e){
+  const sourceLabel=e.source==='upload'?'업로드':e.source==='shoot'?'촬영':e.type==='leave'?'연차':e.type==='meeting'?'회의':'일정';
+  const click=e.source==='upload'?`openUploadModal('${e.id}')`:e.source==='shoot'?`openShootModal('${e.id}')`:`openCalendarEventModal('${e.id}')`;
+  return `<button class="calendar-event ${e.type}" onclick="event.stopPropagation();${click}" title="${esc(e.title)}"><small>${sourceLabel}</small><span>${esc(e.title)}</span></button>`;
+}
+window.moveCalendarMonth=n=>{calendarCursor=new Date(calendarCursor.getFullYear(),calendarCursor.getMonth()+n,1);renderCalendar();};
+window.goCalendarToday=()=>{const n=new Date();calendarCursor=new Date(n.getFullYear(),n.getMonth(),1);renderCalendar();};
+
+function openCalendarEventModal(id=null,presetDate=''){
+  state.schedules=Array.isArray(state.schedules)?state.schedules:[];
+  const existing=id?state.schedules.find(x=>x.id===id):null;
+  const vals=existing||{title:'',date:presetDate||localDate(),type:'manual',member:'',memo:''};
+  const isLeave=vals.type==='leave'||Boolean(vals.isLeave);
+  $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal calendar-event-modal">
+    <div class="modal-head"><div><small>${existing?'일정 수정':'캘린더 일정 추가'}</small><h3>${existing?esc(vals.title||'일정'):'새 일정'}</h3></div><button class="icon-btn" id="closeModal">×</button></div>
+    <form id="calendarEventForm">
+      <div class="calendar-event-form-grid">
+        <label class="full">일정 제목<input name="title" value="${esc(vals.title||'')}" placeholder="${isLeave?'연차는 팀원 선택 시 자동 입력돼요':'일정 제목을 입력하세요'}" ${isLeave?'':'required'}></label>
+        <label>날짜<input type="date" name="date" value="${esc(vals.date||localDate())}" required></label>
+        <label>일정 종류<select name="type">
+          <option value="manual" ${vals.type==='manual'?'selected':''}>기타 일정</option>
+          <option value="meeting" ${vals.type==='meeting'?'selected':''}>회의</option>
+        </select></label>
+        <div class="calendar-leave-row full">
+          <div><b>연차</b><small>연차 일정으로 등록</small></div>
+          <label class="switch"><input type="checkbox" id="calendarLeaveSwitch" ${isLeave?'checked':''}><span></span></label>
+        </div>
+        <label class="full calendar-member-field ${isLeave?'':'hidden'}" id="calendarLeaveMemberWrap">연차 팀원<select name="member"><option value="">팀원 선택</option>${members.map(m=>`<option value="${m}" ${m===vals.member?'selected':''}>${m}</option>`).join('')}</select></label>
+        <label class="full">메모<textarea name="memo" placeholder="필요한 내용을 적어주세요">${esc(vals.memo||'')}</textarea></label>
+      </div>
+      <div class="modal-actions">${existing?'<button type="button" class="danger-btn" id="deleteCalendarEvent">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div>
+    </form>
+  </div></div>`;
+  $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
+  const sw=$('#calendarLeaveSwitch'),wrap=$('#calendarLeaveMemberWrap'),titleInput=$('#calendarEventForm input[name="title"]');
+  sw.onchange=()=>{wrap.classList.toggle('hidden',!sw.checked);if(sw.checked)titleInput.removeAttribute('required');else titleInput.setAttribute('required','');};
+  if(existing)$('#deleteCalendarEvent').onclick=()=>{state.schedules=state.schedules.filter(x=>x.id!==existing.id);save();closeModal();};
+  $('#calendarEventForm').onsubmit=e=>{
+    e.preventDefault();
+    const fd=new FormData(e.target),leave=sw.checked,member=fd.get('member')||'';
+    if(leave&&!member){wrap.classList.remove('hidden');wrap.querySelector('select').focus();return;}
+    const obj={
+      title:leave?`${member} 연차`:String(fd.get('title')||'').trim(),
+      date:fd.get('date'),
+      type:leave?'leave':fd.get('type'),
+      member:leave?member:'',
+      memo:fd.get('memo')||'',
+      isLeave:leave
+    };
+    if(existing)Object.assign(existing,obj);else state.schedules.push({id:uid(),...obj});
+    save();closeModal();
+  };
+}
+window.openCalendarEventModal=openCalendarEventModal;
+
+function renderAll(){renderHome();renderCalendar();renderUploads();renderShoots();renderAds();renderIdeas();renderMeetingsLanding();renderResources();renderNotices();}
 window.deleteById=(key,id)=>{state[key]=state[key].filter(x=>x.id!==id);save();};
 
 const modalDefs={
