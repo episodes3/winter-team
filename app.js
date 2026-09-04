@@ -441,7 +441,7 @@ function renderIdeas(){
       </div>
       <div class="idea-card-bottom"><span>✦ ${x.archived?'ARCHIVE':'IDEA'}</span><button type="button" onclick="event.stopPropagation();deleteById('ideas','${x.id}')">삭제</button></div>
     </article>`;
-  }).join(''):`<div class="idea-empty"><strong>${ideaView==='archive'?'보관된 아이디어가 없어요.':'아직 저장된 아이디어가 없어요.'}</strong><p>${ideaView==='archive'?'아이디어 카드에서 보관을 누르면 이곳으로 이동해요.':'떠오르는 순간 바로 기록해보세요.'}</p>${ideaView==='active'?'<button class="accent-btn" onclick="openModal(\\'ideaModal\\')">+ 첫 아이디어 작성</button>':''}</div>`;
+  }).join(''):`<div class="idea-empty"><strong>${ideaView==='archive'?'보관된 아이디어가 없어요.':'아직 저장된 아이디어가 없어요.'}</strong><p>${ideaView==='archive'?'아이디어 카드에서 보관을 누르면 이곳으로 이동해요.':'떠오르는 순간 바로 기록해보세요.'}</p>${ideaView==='active'?"<button class=\"accent-btn\" onclick=\"openModal('ideaModal')\">+ 첫 아이디어 작성</button>":''}</div>`;
 }
 window.toggleIdeaArchive=id=>{const item=state.ideas.find(x=>x.id===id);if(!item)return;item.archived=!item.archived;save();};
 window.setIdeaView=view=>{ideaView=view;renderIdeas();};
