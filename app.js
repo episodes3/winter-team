@@ -107,6 +107,44 @@ function currentYM(){const d=new Date();return `${d.getFullYear()}-${String(d.ge
 function fmtDate(s){if(!s)return '-';const d=new Date(s+'T00:00:00');return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;}
 function channelPill(ch){return `<span class="channel-pill ${channelClass[ch]||'all'}">${esc(ch)}</span>`;}
 function statusBadge(s){return `<span class="status ${esc(s)}">${esc(s)}</span>`;}
+
+function autoLinkText(value){
+  const safe=esc(String(value??''));
+  return safe
+    .replace(/(https?:\/\/[^\s<]+)/gi,(url)=>{
+      let href=url,trail='';
+      while(/[),.!?;:]$/.test(href)){trail=href.slice(-1)+trail;href=href.slice(0,-1);}
+      return `<a class="auto-text-link" href="${href}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${href}</a>${trail}`;
+    })
+    .replace(/\n/g,'<br>');
+}
+function autoLinkHtml(html){
+  const box=document.createElement('div');
+  box.innerHTML=html||'';
+  const walker=document.createTreeWalker(box,NodeFilter.SHOW_TEXT);
+  const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+  nodes.forEach(node=>{
+    if(node.parentElement?.closest('a,script,style'))return;
+    const text=node.nodeValue||'';
+    const re=/https?:\/\/[^\s<]+/gi;
+    if(!re.test(text))return;
+    re.lastIndex=0;
+    const frag=document.createDocumentFragment();let last=0,m;
+    while((m=re.exec(text))){
+      frag.appendChild(document.createTextNode(text.slice(last,m.index)));
+      let url=m[0],trail='';
+      while(/[),.!?;:]$/.test(url)){trail=url.slice(-1)+trail;url=url.slice(0,-1);}
+      const a=document.createElement('a');a.className='auto-text-link';a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=url;
+      a.addEventListener('click',e=>e.stopPropagation());
+      frag.appendChild(a);if(trail)frag.appendChild(document.createTextNode(trail));
+      last=m.index+m[0].length;
+    }
+    frag.appendChild(document.createTextNode(text.slice(last)));
+    node.replaceWith(frag);
+  });
+  return box.innerHTML;
+}
+
 function workBadge(s){return `<span class="work-dot ${s}"></span>${esc(s)}`;}
 
 $('#loginForm').addEventListener('submit',e=>{e.preventDefault();if($('#passwordInput').value===PASSWORD){sessionStorage.setItem('dashAuth','1');$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');}else $('#loginError').textContent='비밀번호가 틀렸어요.';});
@@ -174,7 +212,7 @@ function renderHomeTodos(){
   const items=[...state.homeTodos].sort((a,b)=>Number(a.done)-Number(b.done)||String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
   list.innerHTML=items.length?items.map(x=>`<div class="home-todo-item ${x.done?'done':''}" onclick="openHomeTodoModal('${x.id}')">
     <button type="button" class="home-todo-check" onclick="event.stopPropagation();toggleHomeTodo('${x.id}')" aria-label="완료">${x.done?'✓':''}</button>
-    <div class="home-todo-content">${safeHomeTodoHtml(x.richHtml||esc(x.text||''))}</div>
+    <div class="home-todo-content">${autoLinkHtml(safeHomeTodoHtml(x.richHtml||esc(x.text||'')))}</div>
     <button type="button" class="home-todo-delete" onclick="event.stopPropagation();deleteHomeTodo('${x.id}')" aria-label="삭제">×</button>
   </div>`).join(''):`<div class="home-todo-empty">아직 할 일이 없어요. <button onclick="openHomeTodoModal()">+ 첫 항목 추가</button></div>`;
 }
@@ -520,7 +558,7 @@ function renderMeetingMonth(year,month,week='1'){
     const icon=obj.format==='check'?`<button type="button" class="meeting-check ${obj.checked?'checked':''}" onclick="event.stopPropagation();toggleMeetingCheck('${selected.id}',${si},${ii})" aria-label="체크">${obj.checked?'✓':''}</button>`:'<span class="meeting-bullet">•</span>';
     const mentions=(obj.mentions||[]).map(m=>`<span class="meeting-mention">@${esc(m)}</span>`).join('');
     const related=obj.related?`<small class="meeting-related">↳ ${esc(obj.related)}</small>`:'';
-    return `<div class="meeting-item ${obj.format==='check'?'check-item':''} ${obj.checked?'checked-item':''}"><span class="meeting-item-icon">${icon}</span><div class="meeting-item-body"><span>${obj.richHtml?sanitizeMeetingRich(obj.richHtml):esc(obj.text||'')}</span>${related}${mentions?`<div class="meeting-mentions-inline">${mentions}</div>`:''}</div><div class="meeting-item-actions"><button onclick="editMeetingItem('${selected.id}',${si},${ii})">수정</button><button onclick="deleteMeetingItem('${selected.id}',${si},${ii})">×</button></div></div>`;
+    return `<div class="meeting-item ${obj.format==='check'?'check-item':''} ${obj.checked?'checked-item':''}"><span class="meeting-item-icon">${icon}</span><div class="meeting-item-body"><span>${autoLinkHtml(obj.richHtml?sanitizeMeetingRich(obj.richHtml):esc(obj.text||''))}</span>${related}${mentions?`<div class="meeting-mentions-inline">${mentions}</div>`:''}</div><div class="meeting-item-actions"><button onclick="editMeetingItem('${selected.id}',${si},${ii})">수정</button><button onclick="deleteMeetingItem('${selected.id}',${si},${ii})">×</button></div></div>`;
   };
   $('#meetingDetail').innerHTML=`<div class="meeting-detail-head"><button class="back-btn" onclick="renderMeetingsLanding()">← 뒤로</button><h1>${year}년 ${month}월 회의록</h1></div>
   <div class="week-tabs">${['1','2','3','4','5'].map(w=>`<button class="${activeWeek===w?'active':''}" onclick="renderMeetingMonth(${year},${month},'${w}')">${w}주차</button>`).join('')}<button class="week-plus" onclick="addMeetingWeek(${year},${month})">+ 주차</button></div>
@@ -621,7 +659,7 @@ function renderIdeas(){
     return `<article class="idea-card ${x.archived?'idea-archived':''}" onclick="openModal('ideaModal','${x.id}')">
       <div class="idea-card-top"><div class="idea-card-meta"><span class="idea-category">${esc(x.category||'기타')}</span><span class="idea-proposer">${esc(x.proposer||'미정')} PD</span></div><small>${esc(x.createdAt||'')}</small></div>
       <h3>${esc(x.title||'제목 없음')}</h3>
-      <p>${esc(x.content||'').replace(/\n/g,'<br>')}</p>
+      <p>${autoLinkText(x.content||'')}</p>
       <div class="idea-card-actions">
         <button type="button" class="idea-archive-btn" onclick="event.stopPropagation();toggleIdeaArchive('${x.id}')">${x.archived?'↩ 다시 꺼내기':'보관'}</button>
       </div>
@@ -686,7 +724,7 @@ function ideaCommentHTML(c,ideaId){
     <div class="idea-comment-avatar" style="background:${col.line}">${esc((c.author||'?')[0])}</div>
     <div class="idea-comment-main">
       <div class="idea-comment-meta"><b>${esc(c.author||'미정')}</b><small>${esc(c.createdAt||'')}</small></div>
-      <p>${esc(c.text||'').replace(/\n/g,'<br>')}</p>
+      <p>${autoLinkText(c.text||'')}</p>
     </div>
     <div class="idea-comment-actions"><button onclick="editIdeaComment('${ideaId}','${c.id}')">수정</button><button onclick="deleteIdeaComment('${ideaId}','${c.id}')">삭제</button></div>
   </div>`;
@@ -851,7 +889,7 @@ function renderResourceMemos(){
           <h4>${esc(x.title||'제목 없음')}</h4>
           <span class="resource-memo-toggle">${active?'−':'+'}</span>
         </div>
-        <div class="resource-memo-preview" onclick="event.stopPropagation()">${sanitizeResourceMemoHtml(x.html||esc(x.text||''))}</div>
+        <div class="resource-memo-preview" onclick="event.stopPropagation()">${autoLinkHtml(sanitizeResourceMemoHtml(x.html||esc(x.text||'')))}</div>
       </div>
       <div class="resource-memo-actions">
         <button onclick="event.stopPropagation();openResourceMemoModal('${x.id}')">✎ 수정</button>
@@ -1026,7 +1064,7 @@ function renderNotices(){
         <strong>${esc(x.title||'제목 없음')}</strong>
         ${x.pinned?'<span>상단 고정</span>':''}
       </div>
-      <p>${esc(x.content||'').replace(/\n/g,'<br>')}</p>
+      <p>${autoLinkText(x.content||'')}</p>
       <div class="notice-meta">${x.author?`<span>${esc(x.author)}</span>`:''}<span>${esc(x.createdAt||x.date||'')}</span></div>
     </div>
   </article>`).join('');

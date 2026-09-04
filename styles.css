@@ -835,3 +835,14 @@
 @media(max-width:600px){
   .delete-undo-toast{bottom:18px;min-width:0;width:calc(100vw - 28px)}
 }
+
+/* V3.52 automatic links in user-entered text */
+.auto-text-link{
+  color:#4f79a8;
+  text-decoration:underline;
+  text-decoration-thickness:1px;
+  text-underline-offset:2px;
+  word-break:break-all;
+  cursor:pointer;
+}
+.auto-text-link:hover{color:#315f91}
