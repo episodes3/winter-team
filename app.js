@@ -153,11 +153,51 @@ function openUploadModal(id=null){
 }
 window.openUploadModal=openUploadModal;
 
+let shootVisibleCounts=Object.fromEntries(channels.map(ch=>[ch,10]));
+
+function shootMembers(x){
+  if(Array.isArray(x.members))return x.members;
+  const legacy=[...(x.assignee?[x.assignee]:[]),...String(x.crew||'').split(',').map(v=>v.trim()).filter(v=>members.includes(v))];
+  return [...new Set(legacy)];
+}
+function openShootModal(id=null){
+  const existing=id?state.shoots.find(x=>x.id===id):null;
+  const vals=existing||{channel:channels[0],title:'',date:localDate(),members:[],selfCam:false,crew:'',method:'PD 자체 촬영',notes:''};
+  const selected=shootMembers(vals);
+  $('#modalRoot').innerHTML=`<div class="modal-backdrop shoot-modal-backdrop"><div class="modal shoot-preset-modal">
+    <div class="modal-head"><div><small>${existing?'촬영 수정':'촬영 추가'}</small><h3>${existing?esc(vals.title||'촬영 정보'):'새 촬영 등록'}</h3></div><button class="icon-btn" id="closeModal">×</button></div>
+    <form id="shootPresetForm">
+      <div class="shoot-preset-body">
+        <label class="shoot-field">채널<select name="channel">${channels.map(ch=>`<option ${ch===vals.channel?'selected':''}>${ch}</option>`).join('')}</select></label>
+        <label class="shoot-field">영상 / 촬영 제목<input name="title" value="${esc(vals.title||'')}" placeholder="촬영 제목을 입력하세요" required></label>
+        <div class="shoot-field"><span>📅 촬영일</span><div class="shoot-date-row"><input type="date" name="date" value="${esc(vals.date||'')}"><input name="dateMemo" value="${esc(vals.dateMemo||'')}" placeholder="메모 (선택)"></div></div>
+        <div class="shoot-field"><span>📋 촬영 멤버</span><div class="shoot-member-chips">${members.map(m=>`<label><input type="checkbox" name="members" value="${m}" ${selected.includes(m)?'checked':''}><span>${m}</span></label>`).join('')}<label class="selfcam-chip"><input type="checkbox" name="selfCam" ${vals.selfCam||vals.method==='셀프캠'?'checked':''}><span>셀프캠</span></label></div></div>
+        <label class="shoot-field">🎥 촬영팀<input name="crew" value="${esc(vals.crew||'')}" placeholder="예: 해리, 듀크, 외주1"></label>
+        <div class="shoot-field"><span>촬영 방식</span><div class="shoot-method-options">${['장비불출 (PD 자체 촬영)','촬영팀 동행','해당없음 (셀프캠)'].map((t,i)=>{const value=i===0?'PD 자체 촬영':i===1?'촬영팀 동행':'셀프캠';return `<label><input type="radio" name="method" value="${value}" ${value===(vals.method||'PD 자체 촬영')?'checked':''}><span>${i===0?'🎒':i===1?'📹':'🦿'} ${t}</span></label>`}).join('')}</div></div>
+        <label class="shoot-field">📝 촬영 준비사항 / 유의사항<textarea name="notes" placeholder="예: 조명 세팅 필요, 의상 미리 준비 등">${esc(vals.notes||'')}</textarea></label>
+      </div>
+      <div class="modal-actions">${existing?'<button type="button" class="danger-btn" id="deleteShoot">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div>
+    </form>
+  </div></div>`;
+  $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
+  if(existing)$('#deleteShoot').onclick=()=>{deleteById('shoots',existing.id);closeModal();};
+  const selfCb=document.querySelector('input[name="selfCam"]');
+  selfCb?.addEventListener('change',()=>{if(selfCb.checked){const r=document.querySelector('input[name="method"][value="셀프캠"]');if(r)r.checked=true;}});
+  $('#shootPresetForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),selectedMembers=fd.getAll('members'),selfCam=fd.get('selfCam')==='on';const obj={channel:fd.get('channel'),title:fd.get('title').trim(),date:fd.get('date'),dateMemo:fd.get('dateMemo')||'',members:selectedMembers,selfCam,assignee:selectedMembers[0]||'',crew:fd.get('crew')||'',method:selfCam?'셀프캠':fd.get('method'),notes:fd.get('notes')||'',equipment:''};if(existing)Object.assign(existing,obj);else state.shoots.push({id:uid(),...obj});save();closeModal();};
+}
+window.openShootModal=openShootModal;
+
 function renderShoots(){
   const total=state.shoots.length,equip=state.shoots.filter(x=>x.equipment&&x.equipment!=='없음'&&x.method!=='셀프캠').length,crew=state.shoots.filter(x=>x.method==='촬영팀 동행').length,self=state.shoots.filter(x=>x.method==='셀프캠').length;
   $('#shootSummary').innerHTML=`<div class="summary-box green"><small>🎒 장비불출</small><strong>${equip}건</strong><span>/ 촬영 ${total}건 · ${total?Math.round(equip/total*100):0}%</span></div><div class="summary-box"><small>🎥 촬영팀 동행</small><strong>${crew}건</strong><span>/ ${total?Math.round(crew/total*100):0}%</span></div><div class="summary-box gray"><small>🦿 해당없음 (셀프캠)</small><strong>${self}건</strong><span>비율 제외</span></div>`;
-  $('#shootColumns').innerHTML=channels.map(ch=>{const arr=state.shoots.filter(x=>x.channel===ch).sort((a,b)=>(a.date||'').localeCompare(b.date||''));return `<section class="channel-col"><h3>${channelPill(ch)}</h3><p>촬영 ${arr.length}건</p><div class="shoot-list">${arr.length?arr.map(x=>`<article class="shoot-card ${channelClass[ch]}" onclick="editItem('shoots','${x.id}')"><div class="shoot-card-head"><h4>${esc(x.title)}</h4><time>${fmtDate(x.date)}</time></div><div class="crew-chips">${(x.crew||'').split(',').filter(Boolean).map(n=>`<span>${esc(n.trim())}</span>`).join('')}</div><small>${esc(x.method||'촬영 방식 미정')}</small>${x.equipment?`<em>🎒 ${esc(x.equipment)}</em>`:''}${x.notes?`<em>${esc(x.notes)}</em>`:''}</article>`).join(''):'<div class="empty">등록된 촬영이 없어요.</div>'}</div></section>`}).join('');
+  $('#shootColumns').innerHTML=channels.map(ch=>{
+    const arr=state.shoots.filter(x=>x.channel===ch).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const limit=shootVisibleCounts[ch]||10,shown=arr.slice(0,limit),remain=Math.max(0,arr.length-limit),next=Math.min(10,remain);
+    const cards=shown.length?shown.map(x=>`<article class="shoot-card ${channelClass[ch]}" onclick="editItem('shoots','${x.id}')"><div class="shoot-card-head"><h4>${esc(x.title)}</h4><time>${fmtDate(x.date)}</time></div><div class="crew-chips">${(x.members||[]).map(n=>`<span>${esc(n)}</span>`).join('')}${x.selfCam?'<span>셀프캠</span>':''}</div>${x.crew?`<small>🎥 ${esc(x.crew)}</small>`:''}<small>${esc(x.method||'촬영 방식 미정')}</small>${x.notes?`<em>${esc(x.notes)}</em>`:''}</article>`).join(''):'<div class="empty">등록된 촬영이 없어요.</div>';
+    return `<section class="channel-col"><h3>${channelPill(ch)}</h3><p>촬영 ${arr.length}건</p><div class="shoot-list">${cards}</div>${remain?`<button class="shoot-more-btn" onclick="showMoreShoots('${ch}')">지난 촬영 ${next}건 펼치기 <span>↓</span></button>`:''}</section>`;
+  }).join('');
 }
+window.showMoreShoots=ch=>{shootVisibleCounts[ch]=(shootVisibleCounts[ch]||10)+10;renderShoots();};
 
 function renderAds(){
   $('#adColumns').innerHTML=channels.map(ch=>{const arr=state.ads.filter(x=>x.channel===ch);return `<section class="channel-col ad-col"><h3>${channelPill(ch)}</h3><div>${arr.length?arr.map(x=>`<article class="ad-row ${channelClass[ch]}" onclick="editItem('ads','${x.id}')"><div><span class="ad-type">${esc(x.adType||'BDC')}</span><b>${esc(x.brand)}</b><small>${esc(x.month||currentYM())}</small></div>${statusBadge(x.status)}</article>`).join(''):'<div class="empty">등록된 광고가 없어요.</div>'}</div></section>`}).join('');
@@ -313,7 +353,7 @@ const modalDefs={
 };
 $$('[data-open]').forEach(b=>b.addEventListener('click',()=>openModal(b.dataset.open)));
 function openModal(name,id=null,preset={}){
-  if(name==='uploadModal'){openUploadModal(id);return;}
+  if(name==='uploadModal'){openUploadModal(id);return;}if(name==='shootModal'){openShootModal(id);return;}
   const d=modalDefs[name], existing=id?state[d.key].find(x=>x.id===id):null,values={...existing,...preset};
   const fields=d.fields.map(([n,l,t,opts])=>{const val=values[n]??'';let input=t==='select'?`<select name="${n}">${opts.map(o=>`<option value="${esc(o)}" ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select>`:t==='textarea'?`<textarea name="${n}">${esc(val)}</textarea>`:`<input name="${n}" type="${t}" value="${esc(val)}" />`;return `<label class="${t==='textarea'?'full':''}">${l}${input}</label>`;}).join('');
   $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal"><div class="modal-head"><h3>${d.title}</h3><button class="icon-btn" id="closeModal">×</button></div><form id="modalForm"><div class="form-grid">${fields}</div><div class="modal-actions">${existing?`<button type="button" class="danger-btn" id="deleteModal">삭제</button>`:''}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div></form></div></div>`;
