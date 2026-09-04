@@ -57,3 +57,77 @@
 .timeline-bar.joo{background:#df4380}.timeline-bar.hye{background:#cb7334}.timeline-bar.dow{background:#3f977a}.timeline-bar.save-needed{box-shadow:0 0 0 2px rgba(246,190,53,.35),0 1px 2px rgba(0,0,0,.08)}
 .timeline-bar:hover{filter:brightness(.96)}
 @media(max-width:760px){.upload-edit-modal{padding:22px 17px;border-radius:14px}.upload-form-grid{grid-template-columns:1fr}.upload-form-grid .full{grid-column:auto}.assignee-range-row{grid-template-columns:80px 1fr}.timeline-head{align-items:flex-start;flex-direction:column}.timeline-head>span{white-space:normal}}
+
+
+/* Meeting readability fix V3.4 */
+.meeting-section h3{font-size:15px}
+.meeting-meta{font-size:12px}
+.week-tabs button{font-size:14px}
+.meeting-item-icon{font-size:13px}
+.meeting-item-body>span{
+  color:#222 !important;
+  opacity:1 !important;
+  visibility:visible !important;
+  font-size:13px !important;
+  line-height:1.75;
+}
+.meeting-item,.meeting-item-body{
+  color:#222 !important;
+  opacity:1 !important;
+  visibility:visible !important;
+}
+.meeting-related{font-size:11px;color:#888}
+.meeting-mention{font-size:10px!important}
+.meeting-add-btn{font-size:12px}
+.meeting-item-actions{opacity:0}
+.meeting-item:hover .meeting-item-actions{opacity:1}
+
+
+/* Meeting rich-text editor V3.5 */
+.meeting-editor-wrap{
+  border:1px solid #e1e1df;
+  border-radius:8px;
+  background:#fff;
+  overflow:hidden;
+}
+.meeting-editor-wrap:focus-within{
+  border-color:#adc961;
+  box-shadow:0 0 0 2px rgba(191,220,122,.18);
+}
+.meeting-editor-toolbar{
+  display:flex;
+  align-items:center;
+  min-height:38px;
+  padding:5px 8px;
+  border-bottom:1px solid #ececea;
+  background:#fafaf8;
+}
+.meeting-bold-btn{
+  width:32px;
+  height:28px;
+  border:1px solid transparent;
+  border-radius:6px;
+  background:transparent;
+  color:#222;
+  font-size:15px;
+  cursor:pointer;
+}
+.meeting-bold-btn:hover{background:#efefeb;border-color:#ddd}
+.meeting-rich-editor{
+  width:100%;
+  min-height:150px;
+  padding:14px;
+  font-size:13px;
+  line-height:1.75;
+  color:#222;
+  outline:none;
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.meeting-rich-editor:empty:before{
+  content:attr(data-placeholder);
+  color:#aaa;
+  pointer-events:none;
+}
+.meeting-rich-editor strong{font-weight:700}
+.meeting-item-body>span strong{font-weight:700;color:inherit}

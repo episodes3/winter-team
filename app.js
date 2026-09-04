@@ -172,6 +172,29 @@ function renderMeetingsLanding(){
   $('#meetingLanding').innerHTML=`<div class="page-head"><div><h1>회의</h1></div><strong class="meeting-year">${year}년</strong></div><div class="month-grid">${Array.from({length:12},(_,i)=>i+1).map(m=>`<button class="month-tile ${m===cur?'current':''}" onclick="openMeetingMonth(${year},${m})"><strong>${m}월</strong>${m===cur?'<span>이번 달</span>':''}<small>${meetingMonthData(year,m).length?meetingMonthData(year,m).length+'개 회의록':''}</small></button>`).join('')}</div>`;
 }
 window.openMeetingMonth=(year,month)=>{renderMeetingMonth(year,month,'1');};
+
+function sanitizeMeetingRich(html){
+  const box=document.createElement('div');box.innerHTML=String(html||'');
+  const walk=node=>{
+    if(node.nodeType===Node.TEXT_NODE)return esc(node.nodeValue||'');
+    if(node.nodeType!==Node.ELEMENT_NODE)return '';
+    const tag=node.tagName.toUpperCase();
+    const inner=[...node.childNodes].map(walk).join('');
+    if(tag==='STRONG'||tag==='B')return `<strong>${inner}</strong>`;
+    if(tag==='BR')return '<br>';
+    if(tag==='DIV'||tag==='P')return `${inner}<br>`;
+    return inner;
+  };
+  return [...box.childNodes].map(walk).join('').replace(/(?:<br>){3,}/g,'<br><br>').replace(/<br>$/,'');
+}
+function meetingPlainTextFromHtml(html){
+  const box=document.createElement('div');box.innerHTML=String(html||'');return (box.innerText||box.textContent||'').trim();
+}
+window.toggleMeetingBold=()=>{
+  const editor=$('#meetingItemEditor');if(!editor)return;
+  editor.focus();
+  document.execCommand('bold',false,null);
+};
 function renderMeetingMonth(year,month,week='1'){
   $('#meetingLanding').classList.add('hidden');$('#meetingDetail').classList.remove('hidden');
   const arr=meetingMonthData(year,month);let selected=arr.find(x=>String(x.week||'1')===String(week));
@@ -186,7 +209,7 @@ function renderMeetingMonth(year,month,week='1'){
     const icon=obj.format==='check'?'☐':'•';
     const mentions=(obj.mentions||[]).map(m=>`<span class="meeting-mention">@${esc(m)}</span>`).join('');
     const related=obj.related?`<small class="meeting-related">↳ ${esc(obj.related)}</small>`:'';
-    return `<div class="meeting-item ${obj.format==='check'?'check-item':''}"><span class="meeting-item-icon">${icon}</span><div class="meeting-item-body"><span>${esc(obj.text||'')}</span>${related}${mentions?`<div class="meeting-mentions-inline">${mentions}</div>`:''}</div><div class="meeting-item-actions"><button onclick="editMeetingItem('${selected.id}',${si},${ii})">수정</button><button onclick="deleteMeetingItem('${selected.id}',${si},${ii})">×</button></div></div>`;
+    return `<div class="meeting-item ${obj.format==='check'?'check-item':''}"><span class="meeting-item-icon">${icon}</span><div class="meeting-item-body"><span>${obj.richHtml?sanitizeMeetingRich(obj.richHtml):esc(obj.text||'')}</span>${related}${mentions?`<div class="meeting-mentions-inline">${mentions}</div>`:''}</div><div class="meeting-item-actions"><button onclick="editMeetingItem('${selected.id}',${si},${ii})">수정</button><button onclick="deleteMeetingItem('${selected.id}',${si},${ii})">×</button></div></div>`;
   };
   $('#meetingDetail').innerHTML=`<div class="meeting-detail-head"><button class="back-btn" onclick="renderMeetingsLanding()">← 뒤로</button><h1>${year}년 ${month}월 회의록</h1></div>
   <div class="week-tabs">${['1','2','3','4','5'].map(w=>`<button class="${activeWeek===w?'active':''}" onclick="renderMeetingMonth(${year},${month},'${w}')">${w}주차</button>`).join('')}<button class="week-plus" onclick="addMeetingWeek(${year},${month})">+ 주차</button></div>
@@ -210,7 +233,7 @@ function meetingRelatedOptions(){
 window.openMeetingItemModal=(meetingId,sectionIndex,itemIndex=null)=>{
   const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;normalizeMeetingSections(m);
   const sec=m.sections[sectionIndex];const raw=itemIndex===null?null:sec.items[itemIndex];
-  const current=typeof raw==='string'?{text:raw,format:'bullet',related:'',mentions:[]}:({...raw});
+  const current=typeof raw==='string'?{text:raw,richHtml:esc(raw),format:'bullet',related:'',mentions:[]}:({...raw}); current.richHtml=current.richHtml||esc(current.text||'');
   const mentions=new Set(current.mentions||[]);
   const relatedOptions=meetingRelatedOptions();
   $('#modalRoot').innerHTML=`<div class="modal-backdrop meeting-modal-backdrop"><div class="meeting-item-modal">
@@ -220,21 +243,26 @@ window.openMeetingItemModal=(meetingId,sectionIndex,itemIndex=null)=>{
       <label><input type="radio" name="meetingFormat" value="check" ${current.format==='check'?'checked':''}><span>□ 체크박스 <em>(할일)</em></span></label>
     </div></div>
     <div class="meeting-popup-group"><label>연관 아이템 <em>(선택 · 미지정 가능)</em></label><select id="meetingRelated"><option value="">— 미지정 —</option>${relatedOptions.map(o=>`<option ${o===current.related?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
-    <div class="meeting-popup-group"><label>내용</label><textarea id="meetingItemText" placeholder="회의 내용을 자유롭게 적어주세요">${esc(current.text||'')}</textarea></div>
+    <div class="meeting-popup-group"><label>내용 <em>· 글자를 선택한 뒤 B를 누르면 굵게 표시돼요</em></label>
+      <div class="meeting-editor-wrap">
+        <div class="meeting-editor-toolbar"><button type="button" class="meeting-bold-btn" onclick="toggleMeetingBold()" title="굵게"><strong>B</strong></button></div>
+        <div id="meetingItemEditor" class="meeting-rich-editor" contenteditable="true" data-placeholder="회의 내용을 자유롭게 적어주세요">${sanitizeMeetingRich(current.richHtml||esc(current.text||''))}</div>
+      </div>
+    </div>
     <div class="meeting-popup-group"><label>멘션 <em>(클릭해서 추가)</em></label><div class="mention-picker">${members.map(name=>`<button type="button" class="mention-chip ${mentions.has(name)?'active':''}" data-name="${esc(name)}" onclick="toggleMeetingMention(this)">@${esc(name)}</button>`).join('')}</div></div>
     <div class="meeting-popup-actions"><button class="outline" onclick="closeMeetingItemModal()">취소</button><button class="accent-btn" onclick="saveMeetingPopup('${meetingId}',${sectionIndex},${itemIndex===null?'null':itemIndex})">저장</button></div>
   </div></div>`;
-  setTimeout(()=>$('#meetingItemText')?.focus(),30);
+  setTimeout(()=>$('#meetingItemEditor')?.focus(),30);
 };
 window.toggleMeetingMention=btn=>btn.classList.toggle('active');
 window.closeMeetingItemModal=()=>{$('#modalRoot').innerHTML='';};
 window.saveMeetingPopup=(meetingId,sectionIndex,itemIndex)=>{
-  const text=String($('#meetingItemText')?.value||'').trim();if(!text){$('#meetingItemText')?.focus();return;}
+  const editor=$('#meetingItemEditor');const richHtml=sanitizeMeetingRich(editor?.innerHTML||'');const text=meetingPlainTextFromHtml(richHtml);if(!text){editor?.focus();return;}
   const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;normalizeMeetingSections(m);
   const format=document.querySelector('input[name="meetingFormat"]:checked')?.value||'bullet';
   const related=$('#meetingRelated')?.value||'';
   const mentions=$$('.mention-chip.active').map(x=>x.dataset.name);
-  const obj={text,format,related,mentions};
+  const obj={text,richHtml,format,related,mentions};
   if(itemIndex===null||itemIndex==='null')m.sections[sectionIndex].items.push(obj);else m.sections[sectionIndex].items[Number(itemIndex)]=obj;
   closeMeetingItemModal();saveMeetingAndStay(m);
 };
