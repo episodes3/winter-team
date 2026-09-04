@@ -754,3 +754,8 @@
 .meeting-add-btn{
   font-size:9px !important;
 }
+
+/* V3.49 hide upload edit period until assignee is checked */
+.assignee-range-row .range-inputs.hidden-until-selected{
+  display:none !important;
+}

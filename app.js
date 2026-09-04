@@ -291,7 +291,7 @@ function openUploadModal(id=null){
     <label>채널<select name="channel" id="uploadChannelSelect">${channels.map(ch=>`<option ${ch===vals.channel?'selected':''}>${ch}</option>`).join('')}</select></label>
     <div class="upload-type-block"><span>영상 유형</span><div class="upload-type-options">${['롱폼','쇼츠','기타'].map(t=>`<label class="type-option"><input type="radio" name="type" value="${t}" ${t===(vals.type||'롱폼')?'checked':''}><span>${t==='롱폼'?'🎬':t==='쇼츠'?'📱':'▣'} ${t}</span></label>`).join('')}</div></div>
     <label class="full">영상 제목<input name="title" value="${esc(vals.title||'')}" required></label>
-    <div class="full assignee-editor"><div class="field-label">담당자 <em>(선택하면 편집 기간 입력 가능)</em></div>${members.map(m=>`<div class="assignee-range-row"><label class="assignee-check"><input type="checkbox" name="assignees" value="${m}" ${selected.includes(m)?'checked':''}><span>${m}</span></label><div class="range-inputs ${selected.includes(m)?'':'disabled'}" data-range="${m}"><input type="date" data-start="${m}" value="${esc(ranges[m]?.start||'')}"><span>~</span><input type="date" data-end="${m}" value="${esc(ranges[m]?.end||'')}"></div></div>`).join('')}</div>
+    <div class="full assignee-editor"><div class="field-label">담당자 <em>(선택하면 편집 기간 입력 가능)</em></div>${members.map(m=>`<div class="assignee-range-row"><label class="assignee-check"><input type="checkbox" name="assignees" value="${m}" ${selected.includes(m)?'checked':''}><span>${m}</span></label><div class="range-inputs ${selected.includes(m)?'':'disabled hidden-until-selected'}" data-range="${m}"><input type="date" data-start="${m}" value="${esc(ranges[m]?.start||'')}"><span>~</span><input type="date" data-end="${m}" value="${esc(ranges[m]?.end||'')}"></div></div>`).join('')}</div>
     <label>예정 업로드일<input type="date" name="date" value="${esc(vals.date||'')}"></label>
     <label>상태<select name="status">${(vals.status==='검수중'?[...uploadStatuses,'검수중']:uploadStatuses).map(st=>`<option ${st===vals.status?'selected':''}>${st}${st==='검수중'?' (기존)':''}</option>`).join('')}</select></label>
     <label class="full seven-check ad-video-check"><input type="checkbox" name="sevenNeed" ${vals.sevenNeed?'checked':''}><span>⭐️ 광고 영상</span></label>
@@ -304,35 +304,23 @@ function openUploadModal(id=null){
   </div><div class="modal-actions upload-actions">${existing?'<button type="button" class="danger-btn" id="deleteUpload">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div></form></div></div>`;
   $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
 
-  const uploadDateInput=document.querySelector('#uploadEditForm input[name="date"]');
-  const autoEditRangeFromUploadDate=(member,force=false)=>{
-    if(existing||!uploadDateInput?.value)return;
+  const setAssigneeRangeToToday=(member)=>{
+    if(existing)return;
     const startInput=document.querySelector(`[data-start="${member}"]`);
     const endInput=document.querySelector(`[data-end="${member}"]`);
     if(!startInput||!endInput)return;
-    const endDate=new Date(`${uploadDateInput.value}T00:00:00`);
-    if(Number.isNaN(endDate.getTime()))return;
-    const startDate=new Date(endDate);
-    startDate.setDate(startDate.getDate()-14);
-    const toLocalDateString=d=>{
-      const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
-      return `${y}-${m}-${day}`;
-    };
-    if(force||!startInput.value)startInput.value=toLocalDateString(startDate);
-    if(force||!endInput.value)endInput.value=uploadDateInput.value;
+    const today=localDate();
+    startInput.value=today;
+    endInput.value=today;
   };
 
   $$('input[name="assignees"]').forEach(cb=>cb.addEventListener('change',()=>{
     const box=document.querySelector(`[data-range="${cb.value}"]`);
+    if(!box)return;
     box.classList.toggle('disabled',!cb.checked);
-    if(cb.checked)autoEditRangeFromUploadDate(cb.value,false);
+    box.classList.toggle('hidden-until-selected',!cb.checked);
+    if(cb.checked)setAssigneeRangeToToday(cb.value);
   }));
-
-  if(!existing){
-    uploadDateInput?.addEventListener('change',()=>{
-      $$('input[name="assignees"]:checked').forEach(cb=>autoEditRangeFromUploadDate(cb.value,true));
-    });
-  }
 
   const adVideoCb=document.querySelector('input[name="sevenNeed"]'),firstDraftField=$('#firstDraftDateField'),adLinkField=$('#uploadAdLinkField'),adSelect=$('#uploadAdSelect'),channelSelect=$('#uploadChannelSelect');
   adVideoCb?.addEventListener('change',()=>{const on=adVideoCb.checked;firstDraftField.classList.toggle('hidden',!on);adLinkField.classList.toggle('hidden',!on);if(!on){firstDraftField.querySelector('input').value='';adSelect.value='';}});
