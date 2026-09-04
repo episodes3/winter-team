@@ -438,3 +438,108 @@
 .upload-ad-link-field select{width:100%;height:40px;border:1px solid #d8dad6;border-radius:9px;background:#fff;padding:0 10px;font-size:10px}
 .upload-ad-link-field small{color:#999;font-size:8px;font-weight:400}
 .linked-ad-badge{display:inline-flex;margin-left:5px;padding:2px 6px;border-radius:99px;background:#fff1c7;color:#8b6500;font-size:8px;font-weight:800}
+
+/* Resource Hub 2x2 desktop layout V3.28 */
+.resource-dashboard-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:28px 30px;
+  align-items:start;
+}
+.resource-tables{
+  display:contents;
+}
+.resource-section{
+  min-width:0;
+  margin:0;
+}
+.resource-memo-section{
+  margin-top:0 !important;
+  min-width:0;
+}
+.resource-section,
+.resource-memo-section{
+  padding:18px 18px 16px;
+  border:1px solid #e7e8e4;
+  border-radius:14px;
+  background:#fff;
+}
+.resource-section-head,
+.resource-memo-head{
+  margin-bottom:12px;
+}
+.resource-table{
+  border-top:1px solid #dedfdb;
+}
+.resource-tr{
+  grid-template-columns:minmax(130px,1.1fr) 82px minmax(150px,1.4fr) 90px;
+}
+.resource-th{
+  font-size:8.5px;
+}
+.resource-name a{
+  font-size:10px;
+}
+.resource-url a{
+  font-size:8.5px;
+}
+.resource-actions button{
+  padding:0 6px;
+  font-size:8px;
+}
+.resource-memo-list{
+  min-height:92px;
+}
+
+@media(max-width:1100px){
+  .resource-dashboard-grid{
+    grid-template-columns:1fr;
+  }
+  .resource-tr{
+    grid-template-columns:minmax(180px,1.2fr) 90px minmax(240px,1.6fr) 100px;
+  }
+}
+
+/* Upload schedule filters: single row on desktop V3.29 */
+@media(min-width:1101px){
+  .upload-filters,
+  .upload-filter-row,
+  .upload-filter-wrap,
+  .filter-row.upload-filter-row,
+  #uploadFilters{
+    display:grid !important;
+    grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+    gap:12px !important;
+    align-items:end !important;
+  }
+  .upload-filters > *,
+  .upload-filter-row > *,
+  .upload-filter-wrap > *,
+  #uploadFilters > *{
+    min-width:0 !important;
+    width:100% !important;
+  }
+}
+
+/* V3.29 fix: actual upload filter container */
+@media(min-width:1101px){
+  #uploadControls.filter-panel{
+    display:grid !important;
+    grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+    gap:16px !important;
+    align-items:start !important;
+  }
+  #uploadControls .filter-row{
+    display:flex !important;
+    flex-wrap:wrap !important;
+    align-items:center !important;
+    gap:6px !important;
+    margin:0 !important;
+    min-width:0 !important;
+  }
+  #uploadControls .filter-row b{
+    width:auto !important;
+    min-width:40px !important;
+    flex:0 0 auto !important;
+  }
+}

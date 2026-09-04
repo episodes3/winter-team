@@ -3,6 +3,7 @@ const members=['윈터','파타','다나','에렌','키엘','브루나'];
 const adManagers=['로건','메이브','젤라'];
 const channels=['주우재','이혜영','도운'];
 const statuses=['기획','촬영예정','촬영완료','편집중','검수중','업로드완료'];
+const uploadStatuses=statuses.filter(s=>s!=='검수중');
 const workStatuses=['근무중','재택중','연차'];
 const meetingSectionDefs=[
   {title:'📣 공지사항',tone:'notice'},
@@ -237,7 +238,7 @@ function inferredEditRange(x,m){
 }
 function renderUploads(){
   const buttons=(label,key,opts)=>`<div class="filter-row"><b>${label}</b>${opts.map(o=>`<button class="${uploadFilter[key]===o?'active':''}" onclick="setUploadFilter('${key}','${o}')">${o}</button>`).join('')}</div>`;
-  $('#uploadControls').innerHTML=`${buttons('채널','channel',['전체',...channels])}${buttons('유형','type',['전체','롱폼','쇼츠','라이브','기타'])}${buttons('담당자','assignee',['전체',...members])}${buttons('상태','status',['전체',...statuses])}`;
+  $('#uploadControls').innerHTML=`${buttons('채널','channel',['전체',...channels])}${buttons('유형','type',['전체','롱폼','쇼츠','기타'])}${buttons('담당자','assignee',['전체',...members])}${buttons('상태','status',['전체',...uploadStatuses])}`;
   const data=state.uploads.filter(x=>{
     if(uploadFilter.channel!=='전체'&&x.channel!==uploadFilter.channel)return false;
     if(uploadFilter.type!=='전체'&&x.type!==uploadFilter.type)return false;
@@ -288,11 +289,11 @@ function openUploadModal(id=null){
   };
   $('#modalRoot').innerHTML=`<div class="modal-backdrop upload-modal-backdrop"><div class="modal upload-edit-modal"><div class="modal-head"><h3>${existing?'업로드 일정 수정':'업로드 일정 추가'}</h3><button class="icon-btn" id="closeModal">×</button></div><form id="uploadEditForm"><div class="upload-form-grid">
     <label>채널<select name="channel" id="uploadChannelSelect">${channels.map(ch=>`<option ${ch===vals.channel?'selected':''}>${ch}</option>`).join('')}</select></label>
-    <div class="upload-type-block"><span>영상 유형</span><div class="upload-type-options">${['롱폼','쇼츠','라이브','기타'].map(t=>`<label class="type-option"><input type="radio" name="type" value="${t}" ${t===(vals.type||'롱폼')?'checked':''}><span>${t==='롱폼'?'🎬':t==='쇼츠'?'📱':'▣'} ${t}</span></label>`).join('')}</div></div>
+    <div class="upload-type-block"><span>영상 유형</span><div class="upload-type-options">${['롱폼','쇼츠','기타'].map(t=>`<label class="type-option"><input type="radio" name="type" value="${t}" ${t===(vals.type||'롱폼')?'checked':''}><span>${t==='롱폼'?'🎬':t==='쇼츠'?'📱':'▣'} ${t}</span></label>`).join('')}</div></div>
     <label class="full">영상 제목<input name="title" value="${esc(vals.title||'')}" required></label>
     <div class="full assignee-editor"><div class="field-label">담당자 <em>(선택하면 편집 기간 입력 가능)</em></div>${members.map(m=>`<div class="assignee-range-row"><label class="assignee-check"><input type="checkbox" name="assignees" value="${m}" ${selected.includes(m)?'checked':''}><span>${m}</span></label><div class="range-inputs ${selected.includes(m)?'':'disabled'}" data-range="${m}"><input type="date" data-start="${m}" value="${esc(ranges[m]?.start||'')}"><span>~</span><input type="date" data-end="${m}" value="${esc(ranges[m]?.end||'')}"></div></div>`).join('')}</div>
     <label>예정 업로드일<input type="date" name="date" value="${esc(vals.date||'')}"></label>
-    <label>상태<select name="status">${statuses.map(st=>`<option ${st===vals.status?'selected':''}>${st}</option>`).join('')}</select></label>
+    <label>상태<select name="status">${(vals.status==='검수중'?[...uploadStatuses,'검수중']:uploadStatuses).map(st=>`<option ${st===vals.status?'selected':''}>${st}${st==='검수중'?' (기존)':''}</option>`).join('')}</select></label>
     <label class="full seven-check ad-video-check"><input type="checkbox" name="sevenNeed" ${vals.sevenNeed?'checked':''}><span>⭐️ 광고 영상</span></label>
     <label class="full upload-ad-link-field ${vals.sevenNeed?'':'hidden'}" id="uploadAdLinkField">어떤 광고인가요?
       <select name="adId" id="uploadAdSelect">${adOptions(vals.channel,vals.adId||'')}</select>
@@ -1054,7 +1055,7 @@ window.deleteById=(key,id)=>{state[key]=state[key].filter(x=>x.id!==id);save();}
 const modalDefs={
   ideaModal:{title:'아이디어 작성',key:'ideas',fields:[['title','아이디어 제목','text'],['content','내용','textarea'],['proposer','제안자','select',members]]},
   todoModal:{title:'업무 추가',key:'todos',fields:[['title','업무 내용','text'],['assignee','담당자','select',members],['channel','채널','select',channels],['status','상태','select',statuses],['due','마감일','date']]},
-  uploadModal:{title:'업로드 일정',key:'uploads',fields:[['channel','채널','select',channels],['type','유형','select',['롱폼','쇼츠','라이브','기타']],['title','영상 제목','text'],['assignee','담당자','select',members],['date','업로드일','date'],['status','상태','select',statuses]]},
+  uploadModal:{title:'업로드 일정',key:'uploads',fields:[['channel','채널','select',channels],['type','유형','select',['롱폼','쇼츠','기타']],['title','영상 제목','text'],['assignee','담당자','select',members],['date','업로드일','date'],['status','상태','select',uploadStatuses]]},
   shootModal:{title:'촬영 정보',key:'shoots',fields:[['channel','채널','select',channels],['title','영상 제목','text'],['assignee','담당 PD','select',members],['date','촬영일','date'],['method','촬영 방식','select',['PD 자체 촬영','촬영팀 동행','셀프캠','기타']],['crew','촬영팀 / 참여자 (쉼표 구분)','text'],['equipment','장비','text'],['notes','준비사항 / 유의사항','textarea']]},
   adModal:{title:'광고 정보',key:'ads',fields:[['channel','채널','select',channels],['brand','브랜드','text'],['adType','광고 유형','select',['BDC','기획PPL','단순PPL','브랜디드','기타']],['assignee','광고 담당자','select',adManagers],['amount','금액','number'],['month','진행 월','month'],['status','상태','select',statuses],['proposal','구성안 전달일','date'],['rough','가편 전달일','date'],['final','최종본 전달일','date'],['memo','메모','textarea']]},
   meetingModal:{title:'회의록 추가',key:'meetings',fields:[['title','회의 제목','text'],['date','날짜','date'],['week','주차','select',['1','2','3','4','5']]]},

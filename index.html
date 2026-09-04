@@ -148,15 +148,17 @@
           <div><h1>리소스 허브</h1><p>자주 쓰는 계정, 툴, 자료를 한 곳에서 관리해요.</p></div>
           <button class="resource-add-btn" onclick="openResourceModal()">링크 추가</button>
         </div>
-        <div id="resourceTables" class="resource-tables"></div>
+        <div class="resource-dashboard-grid">
+          <div id="resourceTables" class="resource-tables"></div>
 
-        <section class="resource-memo-section">
-          <div class="resource-memo-head">
-            <h3>메모 & 텍스트</h3>
-            <button class="resource-add-btn" onclick="openResourceMemoModal()">추가</button>
-          </div>
-          <div id="resourceMemoList" class="resource-memo-list"></div>
-        </section>
+          <section class="resource-memo-section">
+            <div class="resource-memo-head">
+              <h3>메모 & 텍스트</h3>
+              <button class="resource-add-btn" onclick="openResourceMemoModal()">추가</button>
+            </div>
+            <div id="resourceMemoList" class="resource-memo-list"></div>
+          </section>
+        </div>
       </section>
 
       <section id="notices" class="page">
