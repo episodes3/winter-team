@@ -1157,6 +1157,32 @@ function calendarEventButton(e){
   const icon=e.type==='upload'?'▸':e.type==='shoot'?'●':e.type==='meeting'?'◆':e.type==='leave'?'↻':'•';
   return `<button type="button" class="cal-event ${e.type}" onclick="event.stopPropagation();${action}" title="${esc(e.title)}"><b>${icon}</b><span>${esc(e.title)}</span></button>`;
 }
+const koreanHoliday2026={
+  '2026-01-01':'신정',
+  '2026-02-16':'설 연휴',
+  '2026-02-17':'설날',
+  '2026-02-18':'설 연휴',
+  '2026-03-01':'삼일절',
+  '2026-03-02':'대체공휴일',
+  '2026-05-05':'어린이날',
+  '2026-05-24':'부처님오신날',
+  '2026-05-25':'대체공휴일',
+  '2026-06-03':'지방선거일',
+  '2026-06-06':'현충일',
+  '2026-08-15':'광복절',
+  '2026-08-17':'대체공휴일',
+  '2026-09-24':'추석 연휴',
+  '2026-09-25':'추석',
+  '2026-09-26':'추석 연휴',
+  '2026-10-03':'개천절',
+  '2026-10-05':'대체공휴일',
+  '2026-10-09':'한글날',
+  '2026-12-25':'크리스마스'
+};
+function koreanHolidayName(iso){
+  return koreanHoliday2026[iso]||'';
+}
+
 function renderCalendar(){
   const grid=$('#calendarGrid'),label=$('#calendarMonthLabel');if(!grid||!label)return;
   const year=calendarCursor.getFullYear(),month=calendarCursor.getMonth();
@@ -1175,9 +1201,10 @@ function renderCalendar(){
   for(let i=0;i<total;i++){
     const d=new Date(start);d.setDate(start.getDate()+i);
     const iso=localDate(d),inMonth=d.getMonth()===month,dow=d.getDay();
+    const holiday=koreanHolidayName(iso);
     const rows=events.filter(x=>x.date===iso);
-    cells.push(`<div class="cal-cell ${inMonth?'':'outside'} ${iso===today?'today':''}" onclick="openCalendarEventModal(null,'${iso}')">
-      <div class="cal-date ${dow===0?'sun':''} ${dow===6?'sat':''}"><span>${d.getDate()}</span>${iso===today?'<em>오늘</em>':''}</div>
+    cells.push(`<div class="cal-cell ${inMonth?'':'outside'} ${iso===today?'today':''} ${holiday?'holiday':''}" onclick="openCalendarEventModal(null,'${iso}')">
+      <div class="cal-date ${dow===0?'sun':''} ${dow===6?'sat':''} ${holiday?'holiday-date':''}"><span>${d.getDate()}</span>${holiday?`<small class="cal-holiday-name">${esc(holiday)}</small>`:''}${iso===today?'<em>오늘</em>':''}</div>
       <div class="cal-events">${rows.map(calendarEventButton).join('')}</div>
     </div>`);
   }

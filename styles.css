@@ -915,3 +915,29 @@
 .notice-detail-actions{
   margin-top:16px;
 }
+
+/* V3.55 Korean public holidays (2026) */
+.cal-date.holiday-date{
+  color:#dc6666 !important;
+}
+.cal-holiday-name{
+  display:inline-block;
+  max-width:92px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:8px;
+  font-weight:700;
+  color:#d87575;
+  line-height:1;
+}
+.cal-cell.holiday:not(.outside){
+  background:#fffdfd;
+}
+.cal-cell.holiday.today{
+  background:#fbfdfe;
+}
+.cal-cell.outside .cal-date.holiday-date,
+.cal-cell.outside .cal-holiday-name{
+  color:#c7a5a5 !important;
+}
