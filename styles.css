@@ -693,3 +693,17 @@
   text-decoration-thickness:1px;
   text-decoration-color:currentColor;
 }
+
+/* V3.42 resource memo: title toggles, body remains selectable */
+.resource-memo-card-main{
+  cursor:default !important;
+}
+.resource-memo-title-row{
+  cursor:pointer;
+  user-select:none;
+}
+.resource-memo-preview{
+  cursor:text;
+  user-select:text;
+  -webkit-user-select:text;
+}

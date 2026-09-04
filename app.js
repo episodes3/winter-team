@@ -374,7 +374,7 @@ function renderShoots(){
   const total=state.shoots.length,equip=state.shoots.filter(x=>x.equipment&&x.equipment!=='없음'&&x.method!=='셀프캠').length,crew=state.shoots.filter(x=>x.method==='촬영팀 동행').length,self=state.shoots.filter(x=>x.method==='셀프캠').length;
   $('#shootSummary').innerHTML=`<div class="summary-box green"><small>🎒 장비불출</small><strong>${equip}건</strong><span>/ 촬영 ${total}건 · ${total?Math.round(equip/total*100):0}%</span></div><div class="summary-box"><small>🎥 촬영팀 동행</small><strong>${crew}건</strong><span>/ ${total?Math.round(crew/total*100):0}%</span></div><div class="summary-box gray"><small>🦿 해당없음 (셀프캠)</small><strong>${self}건</strong><span>비율 제외</span></div>`;
   $('#shootColumns').innerHTML=channels.map(ch=>{
-    const arr=state.shoots.filter(x=>x.channel===ch).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const arr=state.shoots.filter(x=>x.channel===ch).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
     const limit=shootVisibleCounts[ch]||10,shown=arr.slice(0,limit),remain=Math.max(0,arr.length-limit),next=Math.min(10,remain);
     const cards=shown.length?shown.map(x=>`<article class="shoot-card ${channelClass[ch]}" onclick="editItem('shoots','${x.id}')"><div class="shoot-card-head"><h4>${esc(x.title)}</h4><time>${shootDates(x).map(d=>fmtDate(d.date)+(d.memo?` ${esc(d.memo)}`:'')).join(' · ')||'-'}</time></div><div class="crew-chips">${shootMembers(x).map(shootPdChip).join('')}${shootCrewChips(x.crew)}${x.selfCam||x.method==='셀프캠'?'<span class="shoot-person-chip shoot-selfcam-chip">셀프캠</span>':''}</div><small>${esc(x.method||'촬영 방식 미정')}</small>${x.notes?`<em>${esc(x.notes)}</em>`:''}</article>`).join(''):'<div class="empty">등록된 촬영이 없어요.</div>';
     return `<section class="channel-col"><h3>${channelPill(ch)}</h3><p>촬영 ${arr.length}건</p><div class="shoot-list">${cards}</div>${remain?`<button class="shoot-more-btn" onclick="showMoreShoots('${ch}')">지난 촬영 ${next}건 펼치기 <span>↓</span></button>`:''}</section>`;
@@ -387,6 +387,13 @@ function formatAdMoney(v){
   if(n>=100000000)return `${(n/100000000).toFixed(n%100000000===0?0:1)}억원`;
   return `${Math.round(n/10000).toLocaleString()}만원`;
 }
+function adDisplayMonth(x){
+  if(x?.final){
+    const parts=String(x.final).split('-');
+    if(parts.length>=2)return `${parts[0]}.${parts[1]}`;
+  }
+  return x?.month||'최종본 전달일 미정';
+}
 function adTypeBadge(type){
   const v=type||'BDC';
   const cls={'BDC':'bdc','기획PPL':'planned','단순PPL':'simple','쇼츠':'shorts'}[v]||'legacy';
@@ -398,7 +405,7 @@ function adStatusBadge(status){
   return `<span class="ad-status-badge ad-status-${cls}">${esc(v)}</span>`;
 }
 function renderAds(){
-  $('#adColumns').innerHTML=channels.map(ch=>{const arr=state.ads.filter(x=>x.channel===ch);return `<section class="channel-col ad-col"><h3>${channelPill(ch)}</h3><div>${arr.length?arr.map(x=>`<article class="ad-row ${channelClass[ch]} ${x.status==='업로드 완료'?'ad-completed':''}" onclick="editItem('ads','${x.id}')"><div>${adTypeBadge(x.adType)}<b>${esc(x.brand)}</b><small>${esc(x.month||currentYM())}</small></div>${adStatusBadge(x.status)}</article>`).join(''):'<div class="empty">등록된 광고가 없어요.</div>'}</div></section>`}).join('');
+  $('#adColumns').innerHTML=channels.map(ch=>{const arr=state.ads.filter(x=>x.channel===ch);return `<section class="channel-col ad-col"><h3>${channelPill(ch)}</h3><div>${arr.length?arr.map(x=>`<article class="ad-row ${channelClass[ch]} ${x.status==='업로드 완료'?'ad-completed':''}" onclick="editItem('ads','${x.id}')"><div>${adTypeBadge(x.adType)}<b>${esc(x.brand)}</b><small>${esc(adDisplayMonth(x))}</small></div>${adStatusBadge(x.status)}</article>`).join(''):'<div class="empty">등록된 광고가 없어요.</div>'}</div></section>`}).join('');
   state.adTargets=state.adTargets||{};
   $('#adKpi').innerHTML=channels.map(ch=>{
     const arr=state.ads.filter(x=>x.channel===ch),amt=arr.reduce((s,x)=>s+Number(x.amount||0),0);
@@ -794,12 +801,12 @@ function renderResourceMemos(){
   wrap.innerHTML=state.resourceMemos.length?state.resourceMemos.map(x=>{
     const active=activeResourceMemoId===x.id;
     return `<article class="resource-memo-card ${active?'active':''}">
-      <div class="resource-memo-card-main" onclick="toggleResourceMemo('${x.id}')">
-        <div class="resource-memo-title-row">
+      <div class="resource-memo-card-main">
+        <div class="resource-memo-title-row" onclick="toggleResourceMemo('${x.id}')">
           <h4>${esc(x.title||'제목 없음')}</h4>
           <span class="resource-memo-toggle">${active?'−':'+'}</span>
         </div>
-        <div class="resource-memo-preview">${sanitizeResourceMemoHtml(x.html||esc(x.text||''))}</div>
+        <div class="resource-memo-preview" onclick="event.stopPropagation()">${sanitizeResourceMemoHtml(x.html||esc(x.text||''))}</div>
       </div>
       <div class="resource-memo-actions">
         <button onclick="event.stopPropagation();openResourceMemoModal('${x.id}')">✎ 수정</button>
