@@ -131,3 +131,30 @@
 }
 .meeting-rich-editor strong{font-weight:700}
 .meeting-item-body>span strong{font-weight:700;color:inherit}
+
+/* Upload ad-video option V3.6 */
+.first-draft-field.hidden{display:none!important}
+.ad-video-check{align-items:center}
+.first-draft-field input[type="date"]{margin-top:7px}
+
+/* Ideas vault V3.7 */
+.idea-page-head{align-items:flex-end}
+.idea-toolbar{display:flex;align-items:center;justify-content:space-between;margin:6px 0 20px;padding-bottom:12px;border-bottom:1px solid #ececea}
+.idea-count{font-size:12px;font-weight:700;color:#555}
+.idea-hint{font-size:11px;color:#aaa}
+.idea-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.idea-card{position:relative;min-height:205px;padding:20px 20px 16px;border:1px solid color-mix(in srgb,var(--idea-line) 35%,#e7e7e7);border-top:3px solid var(--idea-line);background:linear-gradient(180deg,var(--idea-bg) 0,#fff 60%);border-radius:14px;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+.idea-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.06)}
+.idea-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:17px}
+.idea-proposer{display:inline-flex;align-items:center;padding:4px 9px;border-radius:99px;background:#fff;border:1px solid #e5e5e2;font-size:10px;font-weight:700;color:#555}
+.idea-card-top small{font-size:9px;color:#aaa}
+.idea-card h3{margin:0 0 10px;font-size:16px;line-height:1.4;color:#222}
+.idea-card p{margin:0;min-height:76px;font-size:12px;line-height:1.7;color:#5b5b5b;word-break:break-word}
+.idea-card-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:18px;padding-top:10px;border-top:1px solid rgba(0,0,0,.06)}
+.idea-card-bottom>span{font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--idea-line)}
+.idea-card-bottom button{border:0;background:transparent;color:#aaa;font-size:9px;cursor:pointer}
+.idea-card-bottom button:hover{color:#d65a5a}
+.idea-empty{grid-column:1/-1;text-align:center;padding:90px 20px;border:1px dashed #ddd;border-radius:14px;color:#888}
+.idea-empty strong{display:block;font-size:15px;color:#555;margin-bottom:7px}.idea-empty p{font-size:11px;margin:0 0 18px}
+@media(max-width:1050px){.idea-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.idea-grid{grid-template-columns:1fr}.idea-toolbar{align-items:flex-start;gap:8px;flex-direction:column}}

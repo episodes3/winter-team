@@ -25,7 +25,7 @@
       <div class="brand"><span>🎬</span><strong>우리팀<br>잘 굴러가유</strong></div>
       <nav id="nav" class="nav">
         <button class="active" data-page="home"><span>⌂</span> 홈</button>
-        <button data-page="calendar"><span>□</span> 캘린더</button>
+        <button data-page="ideas"><span>✦</span> 아이디어 보관함</button>
         <button data-page="meetings"><span>✎</span> 회의</button>
         <button data-page="uploads"><span>▷</span> 업로드 스케줄</button>
         <button data-page="shoots"><span>●</span> 촬영</button>
@@ -62,10 +62,16 @@
         </div>
       </section>
 
-      <section id="calendar" class="page">
-        <div class="page-head"><div><h1>캘린더</h1><p>팀 캘린더 3개를 한 화면에 모았어요.</p></div><a class="outline as-link" href="https://calendar.google.com/calendar/u/3/r" target="_blank">구글 캘린더에서 열기 ↗</a></div>
-        <div class="calendar-key"><span><i class="c c-joo"></i> episodes.winter</span><span><i class="c c-hye"></i> 팀 캘린더 2</span><span><i class="c c-dow"></i> 팀 캘린더 3</span></div>
-        <div class="calendar-shell"><iframe class="calendar-frame" title="팀 구글 캘린더" src="https://calendar.google.com/calendar/embed?height=760&wkst=1&ctz=Asia%2FSeoul&showPrint=0&showTabs=1&showCalendars=1&showTz=0&src=ZXBpc29kZXMud2ludGVyQGdtYWlsLmNvbQ&src=ZjEzODZlOWI4Nzg3OGMxMDVjYjIyNDVkNDE4ZTZjNjlhODFiYmRjOTNkZWQyZWJiYmQ0ZDgzMWFkMDhlMjQyNkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t&src=MTk1MTU4NWQzNGEwODJiNzA4NDA4MjhhYjQ0MTUxNTlkZDMwYjBmZjFmYWViYTBlZGFkN2Q2NDc0YTBiNjdkYkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t" frameborder="0" scrolling="no"></iframe></div>
+      <section id="ideas" class="page">
+        <div class="page-head idea-page-head">
+          <div><h1>💡 아이디어 보관함</h1><p>떠오른 아이템과 아이디어를 가볍게 쌓아두는 공간이에요.</p></div>
+          <button class="accent-btn" data-open="ideaModal">+ 아이디어 작성</button>
+        </div>
+        <div class="idea-toolbar">
+          <div class="idea-count" id="ideaCount">아이디어 0개</div>
+          <div class="idea-hint">카드를 클릭하면 수정할 수 있어요.</div>
+        </div>
+        <div id="ideaGrid" class="idea-grid"></div>
       </section>
 
       <section id="meetings" class="page">

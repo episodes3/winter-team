@@ -5,7 +5,6 @@ const statuses=['기획','촬영예정','촬영완료','편집중','검수중','
 const workStatuses=['근무중','재택중','연차'];
 const meetingSectionDefs=[
   {title:'📣 공지사항',tone:'notice'},
-  {title:'🎬 업로드 리뷰',tone:'review'},
   {title:'💡 아이템 논의',tone:'idea'},
   {title:'🧥 주우재',tone:'joo'},
   {title:'💄 이혜영',tone:'hye'},
@@ -52,9 +51,12 @@ function seed(){
     meetings:[
       {id:uid(),title:'9월 1주차 주간회의',date:localDate(),week:'1',sections:[
         {title:'📣 공지사항',tone:'notice',items:['9월 촬영 스케줄 확정하기','멤버별 강점과 개선점 면담 일정 잡기']},
-        {title:'🎬 업로드 리뷰',tone:'review',items:['업로드 리뷰 다시 시작','잘 본 콘텐츠 추천 모아서 월말 진행']},
         {title:'💡 아이템 논의',tone:'idea',items:['가을 옷 구경 입어만볼게요','서울의 숨은 빈티지샵 디깅','집에서 더 바쁜 브이로그']}
       ]}
+    ],
+    ideas:[
+      {id:uid(),title:'가을 옷장 털기',content:'각자 가지고 있는 가을 최애 아이템을 가져와 스타일링과 구매 이유를 이야기하는 콘텐츠.',proposer:'윈터',createdAt:localDate()},
+      {id:uid(),title:'랜덤 동네 하루 여행',content:'목적지를 미리 정하지 않고 룰렛으로 동네를 뽑아 하루 동안 먹고 놀고 체험하는 아이템.',proposer:'다나',createdAt:localDate()}
     ],
     notices:[{id:uid(),channel:'전체',title:'팀 대시보드 오픈',content:'일정과 진행상황은 여기에서 같이 업데이트해요.',author:'윈터'}],
     schedules:[],
@@ -66,9 +68,10 @@ function seed(){
   };
 }
 function load(){
-  const saved=JSON.parse(localStorage.getItem('teamDashDataV3')||'null'); if(saved)return saved;
+  const saved=JSON.parse(localStorage.getItem('teamDashDataV3')||'null');
+  if(saved){saved.ideas=Array.isArray(saved.ideas)?saved.ideas:[];return saved;}
   const old=JSON.parse(localStorage.getItem('teamDashDataV2')||'null'); const base=seed();
-  if(old){['todos','uploads','shoots','ads','meetings','notices','schedules','resources'].forEach(k=>{if(old[k]?.length)base[k]=old[k].map(x=>({...x,id:x.id||uid()}));});}
+  if(old){['todos','uploads','shoots','ads','meetings','notices','schedules','resources','ideas'].forEach(k=>{if(old[k]?.length)base[k]=old[k].map(x=>({...x,id:x.id||uid()}));});}
   return base;
 }
 const state=load();
@@ -83,7 +86,7 @@ function workBadge(s){return `<span class="work-dot ${s}"></span>${esc(s)}`;}
 $('#loginForm').addEventListener('submit',e=>{e.preventDefault();if($('#passwordInput').value===PASSWORD){sessionStorage.setItem('dashAuth','1');$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');}else $('#loginError').textContent='비밀번호가 틀렸어요.';});
 if(sessionStorage.getItem('dashAuth')==='1'){$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');}
 $$('#nav button').forEach(btn=>btn.addEventListener('click',()=>navigate(btn.dataset.page)));
-function navigate(id){$$('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));$$('.page').forEach(p=>p.classList.toggle('active-page',p.id===id));if(id==='meetings'){const n=new Date();renderMeetingMonth(n.getFullYear(),n.getMonth()+1,String(Math.min(5,Math.ceil(n.getDate()/7))));}window.scrollTo({top:0,behavior:'instant'});}
+function navigate(id){$$('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));$$('.page').forEach(p=>p.classList.toggle('active-page',p.id===id));if(id==='meetings'){const n=new Date(),week=String(Math.min(5,Math.ceil(n.getDate()/7)));renderMeetingMonth(n.getFullYear(),n.getMonth()+1,week);}window.scrollTo({top:0,behavior:'instant'});}
 
 function renderHome(){
   const now=new Date(),tom=new Date();tom.setDate(now.getDate()+1);const weekEnd=new Date();weekEnd.setDate(now.getDate()+7);const td=localDate(now),tm=localDate(tom);
@@ -119,7 +122,7 @@ function renderUploads(){
     return true;
   }).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
   const weeks=[];data.forEach(x=>{const d=new Date((x.date||localDate())+'T00:00:00');const monday=new Date(d);monday.setDate(d.getDate()-((d.getDay()+6)%7));const key=localDate(monday);let w=weeks.find(q=>q.key===key);if(!w){w={key,monday,items:[]};weeks.push(w)}w.items.push(x)});
-  $('#uploadSchedule').innerHTML=weeks.length?weeks.map(w=>{const left=w.items.filter(x=>x.channel==='주우재'),mid=w.items.filter(x=>x.channel==='이혜영'),right=w.items.filter(x=>x.channel==='도운');const card=x=>`<div class="upload-card ${channelClass[x.channel]}" onclick="editItem('uploads','${x.id}')"><div>${channelPill(x.channel)} <b>${esc(x.title)}</b>${x.sevenNeed?'<span class="seven-star">⭐ 세이브본 필요</span>':''}</div><span>${esc(uploadAssignees(x).join(', ')||'미정')} &nbsp; ↑ ${esc(x.date||'미정')}</span><em>${statusBadge(x.status)}</em></div>`;return `<div class="week-row"><div class="week-date"><b>${fmtDate(w.key)}</b><small>${w.monday.getMonth()+1}월 ${Math.ceil(w.monday.getDate()/7)}주</small></div><div class="week-channel">${left.map(card).join('')||'<i>—</i>'}</div><div class="week-channel">${mid.map(card).join('')||'<i>—</i>'}</div><div class="week-channel">${right.map(card).join('')||'<i>—</i>'}</div></div>`}).join(''):'<div class="empty large-empty">조건에 맞는 업로드 일정이 없어요.</div>';
+  $('#uploadSchedule').innerHTML=weeks.length?weeks.map(w=>{const left=w.items.filter(x=>x.channel==='주우재'),mid=w.items.filter(x=>x.channel==='이혜영'),right=w.items.filter(x=>x.channel==='도운');const card=x=>`<div class="upload-card ${channelClass[x.channel]}" onclick="editItem('uploads','${x.id}')"><div>${channelPill(x.channel)} <b>${esc(x.title)}</b>${x.sevenNeed?'<span class="seven-star">⭐ 광고 영상</span>':''}</div><span>${esc(uploadAssignees(x).join(', ')||'미정')} &nbsp; ↑ ${esc(x.date||'미정')}</span><em>${statusBadge(x.status)}</em></div>`;return `<div class="week-row"><div class="week-date"><b>${fmtDate(w.key)}</b><small>${w.monday.getMonth()+1}월 ${Math.ceil(w.monday.getDate()/7)}주</small></div><div class="week-channel">${left.map(card).join('')||'<i>—</i>'}</div><div class="week-channel">${mid.map(card).join('')||'<i>—</i>'}</div><div class="week-channel">${right.map(card).join('')||'<i>—</i>'}</div></div>`}).join(''):'<div class="empty large-empty">조건에 맞는 업로드 일정이 없어요.</div>';
   renderEditTimeline(data.length?data:state.uploads);
 }
 window.setUploadFilter=(k,v)=>{uploadFilter[k]=v;renderUploads();};
@@ -138,13 +141,15 @@ function renderEditTimeline(items){
 }
 function openUploadModal(id=null){
   const existing=id?state.uploads.find(x=>x.id===id):null;
-  const vals=existing||{channel:channels[0],type:'롱폼',title:'',date:localDate(),status:'기획',sevenNeed:false,memo:''};
+  const vals=existing||{channel:channels[0],type:'롱폼',title:'',date:localDate(),status:'기획',sevenNeed:false,firstDraftDate:'',memo:''};
   const selected=uploadAssignees(vals),ranges=Object.fromEntries(members.map(m=>[m,inferredEditRange(vals,m)]));
-  $('#modalRoot').innerHTML=`<div class="modal-backdrop upload-modal-backdrop"><div class="modal upload-edit-modal"><div class="modal-head"><h3>${existing?'업로드 일정 수정':'업로드 일정 추가'}</h3><button class="icon-btn" id="closeModal">×</button></div><form id="uploadEditForm"><div class="upload-form-grid"><label>채널<select name="channel">${channels.map(ch=>`<option ${ch===vals.channel?'selected':''}>${ch}</option>`).join('')}</select></label><div class="upload-type-block"><span>영상 유형</span><div class="upload-type-options">${['롱폼','쇼츠','라이브','기타'].map(t=>`<label class="type-option"><input type="radio" name="type" value="${t}" ${t===(vals.type||'롱폼')?'checked':''}><span>${t==='롱폼'?'🎬':t==='쇼츠'?'📱':'▣'} ${t}</span></label>`).join('')}</div></div><label class="full">영상 제목<input name="title" value="${esc(vals.title||'')}" required></label><div class="full assignee-editor"><div class="field-label">담당자 <em>(선택하면 편집 기간 입력 가능)</em></div>${members.map(m=>`<div class="assignee-range-row"><label class="assignee-check"><input type="checkbox" name="assignees" value="${m}" ${selected.includes(m)?'checked':''}><span>${m}</span></label><div class="range-inputs ${selected.includes(m)?'':'disabled'}" data-range="${m}"><input type="date" data-start="${m}" value="${esc(ranges[m]?.start||'')}"><span>~</span><input type="date" data-end="${m}" value="${esc(ranges[m]?.end||'')}"></div></div>`).join('')}</div><label>예정 업로드일<input type="date" name="date" value="${esc(vals.date||'')}"></label><label>상태<select name="status">${statuses.map(st=>`<option ${st===vals.status?'selected':''}>${st}</option>`).join('')}</select></label><label class="full seven-check"><input type="checkbox" name="sevenNeed" ${vals.sevenNeed?'checked':''}><span>⭐ 세이브본 필요</span></label><label class="full">메모 (선택)<textarea name="memo" placeholder="추가 메모가 있다면 입력하세요!">${esc(vals.memo||'')}</textarea></label></div><div class="modal-actions upload-actions">${existing?'<button type="button" class="danger-btn" id="deleteUpload">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div></form></div></div>`;
+  $('#modalRoot').innerHTML=`<div class="modal-backdrop upload-modal-backdrop"><div class="modal upload-edit-modal"><div class="modal-head"><h3>${existing?'업로드 일정 수정':'업로드 일정 추가'}</h3><button class="icon-btn" id="closeModal">×</button></div><form id="uploadEditForm"><div class="upload-form-grid"><label>채널<select name="channel">${channels.map(ch=>`<option ${ch===vals.channel?'selected':''}>${ch}</option>`).join('')}</select></label><div class="upload-type-block"><span>영상 유형</span><div class="upload-type-options">${['롱폼','쇼츠','라이브','기타'].map(t=>`<label class="type-option"><input type="radio" name="type" value="${t}" ${t===(vals.type||'롱폼')?'checked':''}><span>${t==='롱폼'?'🎬':t==='쇼츠'?'📱':'▣'} ${t}</span></label>`).join('')}</div></div><label class="full">영상 제목<input name="title" value="${esc(vals.title||'')}" required></label><div class="full assignee-editor"><div class="field-label">담당자 <em>(선택하면 편집 기간 입력 가능)</em></div>${members.map(m=>`<div class="assignee-range-row"><label class="assignee-check"><input type="checkbox" name="assignees" value="${m}" ${selected.includes(m)?'checked':''}><span>${m}</span></label><div class="range-inputs ${selected.includes(m)?'':'disabled'}" data-range="${m}"><input type="date" data-start="${m}" value="${esc(ranges[m]?.start||'')}"><span>~</span><input type="date" data-end="${m}" value="${esc(ranges[m]?.end||'')}"></div></div>`).join('')}</div><label>예정 업로드일<input type="date" name="date" value="${esc(vals.date||'')}"></label><label>상태<select name="status">${statuses.map(st=>`<option ${st===vals.status?'selected':''}>${st}</option>`).join('')}</select></label><label class="full seven-check ad-video-check"><input type="checkbox" name="sevenNeed" ${vals.sevenNeed?'checked':''}><span>⭐️ 광고 영상</span></label><label class="full first-draft-field ${vals.sevenNeed?'':'hidden'}" id="firstDraftDateField">1차 가편본 전달일<input type="date" name="firstDraftDate" value="${esc(vals.firstDraftDate||'')}"></label><label class="full">메모 (선택)<textarea name="memo" placeholder="추가 메모가 있다면 입력하세요!">${esc(vals.memo||'')}</textarea></label></div><div class="modal-actions upload-actions">${existing?'<button type="button" class="danger-btn" id="deleteUpload">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div></form></div></div>`;
   $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
   $$('input[name="assignees"]').forEach(cb=>cb.addEventListener('change',()=>{const box=document.querySelector(`[data-range="${cb.value}"]`);box.classList.toggle('disabled',!cb.checked);if(cb.checked&&!box.querySelector('input').value&&vals.date){const r=inferredEditRange({...vals,date:vals.date},cb.value);box.querySelector(`[data-start="${cb.value}"]`).value=r.start;box.querySelector(`[data-end="${cb.value}"]`).value=r.end;}}));
+  const adVideoCb=document.querySelector('input[name="sevenNeed"]'),firstDraftField=$('#firstDraftDateField');
+  if(adVideoCb&&firstDraftField)adVideoCb.addEventListener('change',()=>{firstDraftField.classList.toggle('hidden',!adVideoCb.checked);if(!adVideoCb.checked){const input=firstDraftField.querySelector('input[name="firstDraftDate"]');if(input)input.value='';}});
   if(existing)$('#deleteUpload').onclick=()=>{deleteById('uploads',existing.id);closeModal();};
-  $('#uploadEditForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),assignees=fd.getAll('assignees');const obj={channel:fd.get('channel'),type:fd.get('type'),title:fd.get('title').trim(),date:fd.get('date'),status:fd.get('status'),sevenNeed:fd.get('sevenNeed')==='on',memo:fd.get('memo')||'',assignees,assignee:assignees[0]||'' ,editRanges:{}};assignees.forEach(m=>{obj.editRanges[m]={start:document.querySelector(`[data-start="${m}"]`).value,end:document.querySelector(`[data-end="${m}"]`).value};});if(existing)Object.assign(existing,obj);else state.uploads.push({id:uid(),...obj});save();closeModal();};
+  $('#uploadEditForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),assignees=fd.getAll('assignees');const isAdVideo=fd.get('sevenNeed')==='on';const obj={channel:fd.get('channel'),type:fd.get('type'),title:fd.get('title').trim(),date:fd.get('date'),status:fd.get('status'),sevenNeed:isAdVideo,firstDraftDate:isAdVideo?(fd.get('firstDraftDate')||''):'',memo:fd.get('memo')||'',assignees,assignee:assignees[0]||'' ,editRanges:{}};assignees.forEach(m=>{obj.editRanges[m]={start:document.querySelector(`[data-start="${m}"]`).value,end:document.querySelector(`[data-end="${m}"]`).value};});if(existing)Object.assign(existing,obj);else state.uploads.push({id:uid(),...obj});save();closeModal();};
 }
 window.openUploadModal=openUploadModal;
 
@@ -274,12 +279,30 @@ function saveMeetingAndStay(m){localStorage.setItem('teamDashDataV3',JSON.string
 window.renderCurrentMeeting=(meetingId)=>{const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;const d=new Date(m.date+'T00:00:00');renderMeetingMonth(d.getFullYear(),d.getMonth()+1,String(m.week||'1'));};
 window.addMeetingWeek=(year,month)=>{const used=new Set(meetingMonthData(year,month).map(x=>String(x.week)));const w=['1','2','3','4','5'].find(x=>!used.has(x));if(w)renderMeetingMonth(year,month,w);};
 
+
+function renderIdeas(){
+  state.ideas=Array.isArray(state.ideas)?state.ideas:[];
+  const sorted=[...state.ideas].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const count=$('#ideaCount');if(count)count.textContent=`아이디어 ${sorted.length}개`;
+  const grid=$('#ideaGrid');if(!grid)return;
+  grid.innerHTML=sorted.length?sorted.map(x=>{
+    const c=memberColors[x.proposer]||{bg:'#f7f7f5',line:'#aaa'};
+    return `<article class="idea-card" style="--idea-bg:${c.bg};--idea-line:${c.line}" onclick="openModal('ideaModal','${x.id}')">
+      <div class="idea-card-top"><span class="idea-proposer">${esc(x.proposer||'미정')} PD</span><small>${esc(x.createdAt||'')}</small></div>
+      <h3>${esc(x.title||'제목 없음')}</h3>
+      <p>${esc(x.content||'').replace(/\n/g,'<br>')}</p>
+      <div class="idea-card-bottom"><span>✦ IDEA</span><button type="button" onclick="event.stopPropagation();deleteById('ideas','${x.id}')">삭제</button></div>
+    </article>`;
+  }).join(''):`<div class="idea-empty"><strong>아직 저장된 아이디어가 없어요.</strong><p>떠오르는 순간 바로 기록해보세요.</p><button class="accent-btn" onclick="openModal('ideaModal')">+ 첫 아이디어 작성</button></div>`;
+}
+
 function renderResources(){$('#resourceGrid').innerHTML=state.resources.length?state.resources.map(x=>`<article class="tile"><div class="topline"><span class="status">${esc(x.category||'링크')}</span><button class="del" onclick="deleteById('resources','${x.id}')">삭제</button></div><h4><a href="${esc(x.url)}" target="_blank">${esc(x.name)} ↗</a></h4><p>${esc(x.url)}</p></article>`).join(''):'<div class="empty">등록된 리소스가 없어요.</div>';}
 function renderNotices(){$('#noticeList').innerHTML=state.notices.length?[...state.notices].reverse().map(x=>`<article class="doc"><div class="doc-head"><h4>${channelPill(x.channel)} &nbsp;${esc(x.title)}</h4><div><small>${esc(x.author)}</small> <button class="del" onclick="deleteById('notices','${x.id}')">삭제</button></div></div><p>${esc(x.content)}</p></article>`).join(''):'<div class="empty">공지사항이 없어요.</div>';}
-function renderAll(){renderHome();renderUploads();renderShoots();renderAds();renderMeetingsLanding();renderResources();renderNotices();}
+function renderAll(){renderHome();renderUploads();renderShoots();renderAds();renderIdeas();renderMeetingsLanding();renderResources();renderNotices();}
 window.deleteById=(key,id)=>{state[key]=state[key].filter(x=>x.id!==id);save();};
 
 const modalDefs={
+  ideaModal:{title:'아이디어 작성',key:'ideas',fields:[['title','아이디어 제목','text'],['content','내용','textarea'],['proposer','제안자','select',members]]},
   todoModal:{title:'업무 추가',key:'todos',fields:[['title','업무 내용','text'],['assignee','담당자','select',members],['channel','채널','select',channels],['status','상태','select',statuses],['due','마감일','date']]},
   uploadModal:{title:'업로드 일정',key:'uploads',fields:[['channel','채널','select',channels],['type','유형','select',['롱폼','쇼츠','라이브','기타']],['title','영상 제목','text'],['assignee','담당자','select',members],['date','업로드일','date'],['status','상태','select',statuses]]},
   shootModal:{title:'촬영 정보',key:'shoots',fields:[['channel','채널','select',channels],['title','영상 제목','text'],['assignee','담당 PD','select',members],['date','촬영일','date'],['method','촬영 방식','select',['PD 자체 촬영','촬영팀 동행','셀프캠','기타']],['crew','촬영팀 / 참여자 (쉼표 구분)','text'],['equipment','장비','text'],['notes','준비사항 / 유의사항','textarea']]},
@@ -295,12 +318,12 @@ function openModal(name,id=null,preset={}){
   const fields=d.fields.map(([n,l,t,opts])=>{const val=values[n]??'';let input=t==='select'?`<select name="${n}">${opts.map(o=>`<option value="${esc(o)}" ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select>`:t==='textarea'?`<textarea name="${n}">${esc(val)}</textarea>`:`<input name="${n}" type="${t}" value="${esc(val)}" />`;return `<label class="${t==='textarea'?'full':''}">${l}${input}</label>`;}).join('');
   $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal"><div class="modal-head"><h3>${d.title}</h3><button class="icon-btn" id="closeModal">×</button></div><form id="modalForm"><div class="form-grid">${fields}</div><div class="modal-actions">${existing?`<button type="button" class="danger-btn" id="deleteModal">삭제</button>`:''}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div></form></div></div>`;
   $('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;if(existing)$('#deleteModal').onclick=()=>{deleteById(d.key,existing.id);closeModal();};
-  $('#modalForm').onsubmit=e=>{e.preventDefault();let obj=Object.fromEntries(new FormData(e.target).entries());if(name==='meetingModal'&&!existing)obj.sections=meetingSectionDefs.map(x=>({...x,items:[]}));if(existing){Object.assign(existing,obj);}else{obj.id=uid();state[d.key].push(obj);}save();closeModal();};
+  $('#modalForm').onsubmit=e=>{e.preventDefault();let obj=Object.fromEntries(new FormData(e.target).entries());if(name==='meetingModal'&&!existing)obj.sections=meetingSectionDefs.map(x=>({...x,items:[]}));if(name==='ideaModal'&&!existing)obj.createdAt=localDate();if(existing){Object.assign(existing,obj);}else{obj.id=uid();state[d.key].push(obj);}save();closeModal();};
 }
 function closeModal(){$('#modalRoot').innerHTML='';}
 window.editItem=(key,id)=>openModal({uploads:'uploadModal',shoots:'shootModal',ads:'adModal',meetings:'meetingModal'}[key],id);
 window.openModal=openModal;
-$('#globalSearch').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();$$('.member-card,.tile,.doc,.simple-row,.upload-card,.shoot-card,.ad-row').forEach(el=>el.style.display=!q||el.textContent.toLowerCase().includes(q)?'':'none');});
+$('#globalSearch').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();$$('.member-card,.tile,.doc,.simple-row,.upload-card,.shoot-card,.ad-row,.idea-card').forEach(el=>el.style.display=!q||el.textContent.toLowerCase().includes(q)?'':'none');});
 $('#exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='우리팀-잘-굴러가유-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);};
 $('#todayLabel').textContent=new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date());
 renderAll();
