@@ -227,7 +227,7 @@ function workBadge(s){return `<span class="work-dot ${s}"></span>${esc(s)}`;}
 $('#loginForm').addEventListener('submit',e=>{e.preventDefault();handleDashboardLogin($('#passwordInput').value);});
 supabaseClient.auth.getSession().then(({data})=>{if(data.session)enterDashboard();});
 $$('#nav button').forEach(btn=>btn.addEventListener('click',()=>navigate(btn.dataset.page)));
-function navigate(id){$$('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));$$('.page').forEach(p=>p.classList.toggle('active-page',p.id===id));if(id==='meetings'){const n=new Date(),week=String(Math.min(5,Math.ceil(n.getDate()/7)));renderMeetingMonth(n.getFullYear(),n.getMonth()+1,week);}if(id==='calendar')renderCalendar();window.scrollTo({top:0,behavior:'instant'});}
+function navigate(id){$$('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));$$('.page').forEach(p=>p.classList.toggle('active-page',p.id===id));if(id==='meetings'){const n=new Date(),week=String(Math.min(5,Math.ceil(n.getDate()/7)));renderMeetingMonth(n.getFullYear(),n.getMonth()+1,week);}if(id==='calendar')renderCalendar();if(id==='ads'){requestAnimationFrame(()=>renderAds());}window.scrollTo({top:0,behavior:'instant'});}
 
 function renderHome(){
   const now=new Date(),tom=new Date();tom.setDate(now.getDate()+1);const weekEnd=new Date();weekEnd.setDate(now.getDate()+7);const td=localDate(now),tm=localDate(tom);
