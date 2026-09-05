@@ -703,27 +703,35 @@ window.toggleMeetingCheck=(meetingId,sectionIndex,itemIndex)=>{
   renderMeetingMonth(new Date(m.date+'T00:00:00').getFullYear(),new Date(m.date+'T00:00:00').getMonth()+1,String(m.week||'1'));
 };
 
-function meetingRelatedOptions(){
-  const rows=[
-    ...state.uploads.map(x=>`업로드 · ${x.title}`),
-    ...state.shoots.map(x=>`촬영 · ${x.title}`),
-    ...state.ads.map(x=>`광고 · ${x.brand}`)
-  ];
-  return [...new Set(rows)].slice(0,60);
+function meetingRelatedOptions(currentRelated=''){
+  const today=localDate();
+  const uploads=(state.uploads||[])
+    .filter(x=>x&&x.date&&x.date>=today)
+    .sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.title||'').localeCompare(String(b.title||'')))
+    .map(x=>({
+      value:`[${x.channel||'채널 미정'}] ${x.title||'제목 없음'}`,
+      label:`[${x.channel||'채널 미정'}] ${x.title||'제목 없음'}`
+    }));
+
+  // 기존 회의록에 이미 연결된 값은 업로드일이 지났더라도 수정 시 보존할 수 있게 남겨둠.
+  if(currentRelated&&!uploads.some(o=>o.value===currentRelated)){
+    uploads.unshift({value:currentRelated,label:`${currentRelated} (기존)`});
+  }
+  return uploads;
 }
 window.openMeetingItemModal=(meetingId,sectionIndex,itemIndex=null)=>{
   const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;normalizeMeetingSections(m);
   const sec=m.sections[sectionIndex];const raw=itemIndex===null?null:sec.items[itemIndex];
   const current=typeof raw==='string'?{text:raw,richHtml:esc(raw),format:'bullet',related:'',mentions:[]}:({...raw}); current.richHtml=current.richHtml||esc(current.text||'');
   const mentions=new Set(current.mentions||[]);
-  const relatedOptions=meetingRelatedOptions();
+  const relatedOptions=meetingRelatedOptions(current.related||'');
   $('#modalRoot').innerHTML=`<div class="modal-backdrop meeting-modal-backdrop"><div class="meeting-item-modal">
     <div class="meeting-popup-head"><h3>${itemIndex===null?'항목 추가':'항목 수정'}</h3><button class="icon-btn" onclick="closeMeetingItemModal()">×</button></div>
     <div class="meeting-popup-group"><label>형식</label><div class="format-options">
       <label><input type="radio" name="meetingFormat" value="bullet" ${current.format!=='check'?'checked':''}><span>● 불릿 <em>(아이디어)</em></span></label>
       <label><input type="radio" name="meetingFormat" value="check" ${current.format==='check'?'checked':''}><span>□ 체크박스 <em>(할일)</em></span></label>
     </div></div>
-    <div class="meeting-popup-group"><label>연관 아이템 <em>(선택 · 미지정 가능)</em></label><select id="meetingRelated"><option value="">— 미지정 —</option>${relatedOptions.map(o=>`<option ${o===current.related?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
+    <div class="meeting-popup-group"><label>연관 아이템 <em>(예정된 업로드만 표시)</em></label><select id="meetingRelated"><option value="">— 미지정 —</option>${relatedOptions.map(o=>`<option value="${esc(o.value)}" ${o.value===current.related?'selected':''}>${esc(o.label)}</option>`).join('')}</select></div>
     <div class="meeting-popup-group"><label>내용 <em>· 글자를 선택한 뒤 B를 누르면 굵게 표시돼요</em></label>
       <div class="meeting-editor-wrap">
         <div class="meeting-editor-toolbar"><button type="button" class="meeting-bold-btn" onclick="toggleMeetingBold()" title="굵게"><strong>B</strong></button></div>
