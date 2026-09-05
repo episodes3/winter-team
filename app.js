@@ -540,9 +540,14 @@ function adStatusBadge(status){
   return `<span class="ad-status-badge ad-status-${cls}">${esc(v)}</span>`;
 }
 function renderAds(){
-  $('#adColumns').innerHTML=channels.map(ch=>{const arr=state.ads.filter(x=>x.channel===ch);return `<section class="channel-col ad-col"><h3>${channelPill(ch)}</h3><div>${arr.length?arr.map(x=>`<article class="ad-row ${channelClass[ch]} ${x.status==='업로드 완료'?'ad-completed':''}" onclick="editItem('ads','${x.id}')"><div>${adTypeBadge(x.adType)}<b>${esc(x.brand)}</b><small>${esc(adDisplayMonth(x))}</small></div>${adStatusBadge(x.status)}</article>`).join(''):'<div class="empty">등록된 광고가 없어요.</div>'}</div></section>`}).join('');
+  state.ads=Array.isArray(state.ads)?state.ads:[];
   state.adTargets=state.adTargets||{};
-  $('#adKpi').innerHTML=channels.map(ch=>{
+
+  const kpi=$('#adKpi');
+  const columns=$('#adColumns');
+  if(!kpi||!columns)return;
+
+  kpi.innerHTML=channels.map(ch=>{
     const arr=state.ads.filter(x=>x.channel===ch),amt=arr.reduce((s,x)=>s+Number(x.amount||0),0);
     const target=Number(state.adTargets[ch]||0);
     const rate=target>0?(amt/target*100):null;
@@ -556,6 +561,22 @@ function renderAds(){
       </div>
     </div>`;
   }).join('');
+
+  columns.innerHTML=`<div class="ad-list-head"><h2>광고 리스트</h2><span>총 ${state.ads.length}건</span></div>
+    <div class="ad-list-columns">
+      ${channels.map(ch=>{
+        const arr=state.ads.filter(x=>x.channel===ch);
+        return `<section class="channel-col ad-col">
+          <h3>${channelPill(ch)}<small>${arr.length}건</small></h3>
+          <div class="ad-list-body">
+            ${arr.length?arr.map(x=>`<article class="ad-row ${channelClass[ch]} ${x.status==='업로드 완료'?'ad-completed':''}" onclick="editItem('ads','${x.id}')">
+              <div>${adTypeBadge(x.adType)}<b>${esc(x.brand||'브랜드 미정')}</b><small>${esc(adDisplayMonth(x))}</small></div>
+              ${adStatusBadge(x.status)}
+            </article>`).join(''):'<div class="empty">등록된 광고가 없어요.</div>'}
+          </div>
+        </section>`;
+      }).join('')}
+    </div>`;
 }
 window.setAdTarget=ch=>{
   state.adTargets=state.adTargets||{};

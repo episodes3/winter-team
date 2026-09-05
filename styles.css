@@ -1030,3 +1030,102 @@
 /* V3.58 - Home notices: title + author only */
 .home-notice-row{grid-template-columns:1fr auto!important;padding-left:2px!important}
 .home-notice-row b{padding-left:0!important}
+
+/* V3.64 — 홈 공지 제목 영역 약 2배 확장 + 최대 2줄 */
+#homeNotices .home-notice-row{
+  grid-template-columns:minmax(0, 2fr) auto !important;
+  column-gap:18px !important;
+  align-items:center !important;
+}
+#homeNotices .home-notice-row > b{
+  min-width:0 !important;
+  max-width:100% !important;
+  white-space:normal !important;
+  overflow:hidden !important;
+  text-overflow:clip !important;
+  display:-webkit-box !important;
+  -webkit-box-orient:vertical !important;
+  -webkit-line-clamp:2 !important;
+  line-clamp:2;
+  word-break:keep-all !important;
+  overflow-wrap:break-word !important;
+  line-height:1.45 !important;
+}
+#homeNotices .home-notice-row > small{
+  justify-self:end !important;
+  white-space:nowrap !important;
+}
+@media(max-width:700px){
+  #homeNotices .home-notice-row{
+    grid-template-columns:minmax(0,1fr) auto !important;
+    column-gap:10px !important;
+  }
+}
+
+/* V3.65 — 광고 리스트 표시 복구 */
+#ads #adColumns.ad-list-wrap{
+  display:block !important;
+  width:100% !important;
+  min-height:1px !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  margin-top:42px;
+}
+.ad-list-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:14px;
+  padding-bottom:10px;
+  border-bottom:1px solid var(--line);
+}
+.ad-list-head h2{
+  margin:0;
+  font-size:15px;
+  letter-spacing:-.02em;
+}
+.ad-list-head span{
+  color:#999;
+  font-size:9px;
+}
+.ad-list-columns{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:34px;
+  visibility:visible !important;
+}
+.ad-list-columns .ad-col{
+  display:block !important;
+  min-width:0;
+  visibility:visible !important;
+}
+.ad-list-columns .ad-col>h3{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin:0 0 9px;
+}
+.ad-list-columns .ad-col>h3>small{
+  color:#aaa;
+  font-size:8px;
+  font-weight:500;
+}
+.ad-list-body{
+  display:grid !important;
+  gap:1px;
+  min-height:38px;
+}
+.ad-list-body .ad-row{
+  display:flex !important;
+  min-height:45px;
+  background:#fff;
+  border-bottom:1px solid #f0f0ed;
+}
+@media(max-width:1050px){
+  .ad-list-columns{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  .ad-list-columns{grid-template-columns:1fr}
+}
