@@ -1375,3 +1375,17 @@
 .ad2-main .ad-type-simple, .ad2-main .ad-type.simple, .ad2-main .ad-type-simple.ad-type{background:#fff5e8 !important;color:#c98337 !important;}
 .ad2-main .ad-type-shorts, .ad2-main .ad-type.shorts, .ad2-main .ad-type-shorts.ad-type{background:#eef9f0 !important;color:#4b9760 !important;}
 .ad2-main .ad-type-legacy, .ad2-main .ad-type.legacy, .ad2-main .ad-type-legacy.ad-type{background:#f2f2ef !important;color:#777 !important;}
+
+/* V3.79 — 모바일 광고 탭 표시 보정 */
+@media(max-width:760px){
+  #ads.active-page{display:block !important;visibility:visible !important;opacity:1 !important;width:100% !important;min-width:0 !important;}
+  #ads .page-head{display:flex !important;align-items:flex-start !important;gap:10px !important;flex-wrap:wrap !important;}
+  #adsDashboard,.ads-dashboard-v2{display:block !important;visibility:visible !important;opacity:1 !important;width:100% !important;min-width:0 !important;min-height:120px !important;overflow:visible !important;}
+  .ad2-list-section,.ad2-kpi-section,.ad2-channel,.ad2-kpi{display:block !important;visibility:visible !important;opacity:1 !important;width:100% !important;min-width:0 !important;}
+  .ad2-columns,.ad2-kpis{display:grid !important;grid-template-columns:1fr !important;gap:20px !important;width:100% !important;}
+  .ad2-list{display:grid !important;width:100% !important;}
+  .ad2-row{display:flex !important;width:100% !important;min-width:0 !important;}
+  .ad2-row[style*="display:none"]{display:none !important;}
+  .ad2-main{min-width:0 !important;flex:1 1 auto !important;}
+  .ad2-meta{flex:0 0 auto !important;}
+}
