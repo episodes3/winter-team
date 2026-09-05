@@ -255,7 +255,7 @@ function renderHome(){
     return `<article class="member-card" style="--member-bg:${col.bg};--member-line:${col.line}"><div class="member-head"><div class="member-name"><span class="avatar" style="background:${col.line}">${m[0]}</span><div><b>${m}</b><small>${workBadge(ws)}</small></div></div><select class="work-select" onchange="setWorkStatus('${m}',this.value)">${workStatuses.map(s=>`<option ${s===ws?'selected':''}>${s}</option>`).join('')}</select></div><div class="remote-days-wrap"><span>재택근무</span><div class="remote-day-list">${remoteDayButtons}</div></div><div class="member-tasks">${tasks.length?tasks.map(t=>t.kind==='upload'?`<div class="mini-task upload-mini-task" onclick="openUploadModal('${t.id}')" title="업로드 일정 수정"><span><b class="mini-task-kind">업로드</b>${esc(t.title)}</span><div class="mini-task-right"><em>${t.date?fmtDate(t.date):esc(t.status)}</em></div></div>`:`<div class="mini-task" onclick="openModal('todoModal','${t.id}')" title="클릭해서 수정"><span class="mini-task-main">○ &nbsp;${esc(t.title)} <b class="mini-channel-tag ${t.channel==='기타'?'other':''}">${esc(t.channel||'기타')}</b></span><div class="mini-task-right"><em>${esc(t.status)}</em><button type="button" class="mini-task-delete" onclick="event.stopPropagation();deleteById('todos','${t.id}')" title="업무 삭제">×</button></div></div>`).join(''):'<div class="no-task">등록된 업무가 없어요.</div>'}</div><button class="member-add" onclick="openTodoFor('${m}')">+ 업무 추가</button></article>`;
   }).join('');
   const shoots=[...state.shoots].filter(x=>x.date).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);$('#homeShoots').innerHTML=shoots.length?shoots.map(x=>`<div class="simple-row">${channelPill(x.channel)}<b>${esc(x.title)}</b><small>${fmtDate(x.date)} · ${esc(x.assignee)}</small></div>`).join(''):'<div class="empty">등록된 촬영이 없어요.</div>';
-  $('#homeNotices').innerHTML=state.notices.length?[...state.notices].reverse().slice(0,5).map(x=>`<div class="simple-row">${channelPill(x.channel)}<b>${esc(x.title)}</b><small>${esc(x.author)}</small></div>`).join(''):'<div class="empty">공지사항이 없어요.</div>';
+  $('#homeNotices').innerHTML=state.notices.length?[...state.notices].reverse().slice(0,5).map(x=>`<div class="simple-row home-notice-row"><b>${esc(x.title)}</b><small>${esc(x.author)}</small></div>`).join(''):'<div class="empty">공지사항이 없어요.</div>';
 }
 
 function safeHomeTodoHtml(html){
@@ -1103,6 +1103,17 @@ function openResourceMemoModal(id=null){
   resourceMemoSavedRange=null;
   setTimeout(()=>{
     memoEditor?.focus();
+    // 새 메모는 항상 일반체로 시작한다. 이전 contenteditable의 굵게 입력 상태를 이어받지 않도록 초기화.
+    if(!existing&&memoEditor){
+      try{
+        if(document.queryCommandState('bold'))document.execCommand('bold',false,null);
+      }catch{}
+      const boldBtn=$('#resourceMemoBoldBtn');
+      if(boldBtn){
+        boldBtn.classList.remove('active');
+        boldBtn.setAttribute('aria-pressed','false');
+      }
+    }
     saveResourceMemoSelection();
   },0);
 }
