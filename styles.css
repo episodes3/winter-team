@@ -1277,3 +1277,50 @@
 .meeting-related-chip > span{
   font-size:9px !important;
 }
+
+/* V3.74 — 광고 분류 태그 컬러 + KPI 채널 컬러 */
+.ad2-main .ad-type{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:max-content;
+  padding:2px 6px;
+  border-radius:4px;
+  font-size:8px;
+  font-weight:700;
+  line-height:1.3;
+}
+.ad2-main .ad-type-bdc{
+  background:#eef0ff;
+  color:#5e63b6;
+}
+.ad2-main .ad-type-planned{
+  background:#fff0f6;
+  color:#cf5f8d;
+}
+.ad2-main .ad-type-simple{
+  background:#fff5e8;
+  color:#c98337;
+}
+.ad2-main .ad-type-shorts{
+  background:#eef9f0;
+  color:#4b9760;
+}
+.ad2-main .ad-type-legacy{
+  background:#f2f2ef;
+  color:#777;
+}
+
+/* KPI의 핵심 숫자는 채널 고유 컬러 */
+.ad2-kpi.joo .ad2-kpi-grid > span:nth-child(1) strong,
+.ad2-kpi.joo .ad2-kpi-grid > span:nth-child(2) strong{
+  color:#ec5d91;
+}
+.ad2-kpi.hye .ad2-kpi-grid > span:nth-child(1) strong,
+.ad2-kpi.hye .ad2-kpi-grid > span:nth-child(2) strong{
+  color:#c86d1c;
+}
+.ad2-kpi.dow .ad2-kpi-grid > span:nth-child(1) strong,
+.ad2-kpi.dow .ad2-kpi-grid > span:nth-child(2) strong{
+  color:#4a967c;
+}

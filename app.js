@@ -493,7 +493,7 @@ function openShootModal(id=null){
         <div class="shoot-field"><span>📅 촬영일</span><div id="shootDateRows" class="shoot-date-rows">${dateRows}</div><button type="button" class="shoot-date-add" id="addShootDate">+ 촬영일 추가</button></div>
         <div class="shoot-field"><span>📋 촬영 멤버</span><div class="shoot-member-chips">${members.map(m=>`<label><input type="checkbox" name="members" value="${m}" ${selected.includes(m)?'checked':''}><span>${m}</span></label>`).join('')}<label class="selfcam-chip"><input type="checkbox" name="selfCam" ${vals.selfCam||vals.method==='셀프캠'?'checked':''}><span>셀프캠</span></label></div></div>
         <label class="shoot-field">🎥 촬영팀<input name="crew" value="${esc(vals.crew||'')}" placeholder="예: 해리, 듀크, 외주1"></label>
-        <div class="shoot-field"><span>촬영 방식</span><div class="shoot-method-options">${['장비불출 (PD 자체 촬영)','촬영팀 동행','해당없음 (셀프캠)'].map((t,i)=>{const value=i===0?'PD 자체 촬영':i===1?'촬영팀 동행':'셀프캠';return `<label><input type="radio" name="method" value="${value}" ${value===(vals.method||'PD 자체 촬영')?'checked':''}><span>${i===0?'🎒':i===1?'📹':'🦿'} ${t}</span></label>`}).join('')}</div></div>
+        <div class="shoot-field"><span>촬영 방식</span><div class="shoot-method-options">${['PD 자체 촬영','촬영팀 동행','해당없음 (셀프캠)'].map((t,i)=>{const value=i===0?'PD 자체 촬영':i===1?'촬영팀 동행':'셀프캠';return `<label><input type="radio" name="method" value="${value}" ${value===(vals.method||'PD 자체 촬영')?'checked':''}><span>${i===0?'🎒':i===1?'📹':'🦿'} ${t}</span></label>`}).join('')}</div></div>
         <label class="shoot-field">📝 촬영 준비사항 / 유의사항<textarea name="notes" placeholder="예: 조명 세팅 필요, 의상 미리 준비 등">${esc(vals.notes||'')}</textarea></label>
       </div>
       <div class="modal-actions">${existing?'<button type="button" class="danger-btn" id="deleteShoot">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div>
@@ -522,8 +522,8 @@ function shootCrewChips(crew){
   return names.map(n=>`<span class="shoot-person-chip shoot-camera-chip">${esc(n)}</span>`).join('');
 }
 function renderShoots(){
-  const total=state.shoots.length,equip=state.shoots.filter(x=>x.equipment&&x.equipment!=='없음'&&x.method!=='셀프캠').length,crew=state.shoots.filter(x=>x.method==='촬영팀 동행').length,self=state.shoots.filter(x=>x.method==='셀프캠').length;
-  $('#shootSummary').innerHTML=`<div class="summary-box green"><small>🎒 장비불출</small><strong>${equip}건</strong><span>/ 촬영 ${total}건 · ${total?Math.round(equip/total*100):0}%</span></div><div class="summary-box"><small>🎥 촬영팀 동행</small><strong>${crew}건</strong><span>/ ${total?Math.round(crew/total*100):0}%</span></div><div class="summary-box gray"><small>🦿 해당없음 (셀프캠)</small><strong>${self}건</strong><span>비율 제외</span></div>`;
+  const total=state.shoots.length,pdSelf=state.shoots.filter(x=>x.method==='PD 자체 촬영').length,crew=state.shoots.filter(x=>x.method==='촬영팀 동행').length,self=state.shoots.filter(x=>x.method==='셀프캠').length;
+  $('#shootSummary').innerHTML=`<div class="summary-box green"><small>🎥 PD 자체 촬영</small><strong>${pdSelf}건</strong><span>/ 촬영 ${total}건 · ${total?Math.round(pdSelf/total*100):0}%</span></div><div class="summary-box"><small>🎥 촬영팀 동행</small><strong>${crew}건</strong><span>/ ${total?Math.round(crew/total*100):0}%</span></div><div class="summary-box gray"><small>🦿 해당없음 (셀프캠)</small><strong>${self}건</strong><span>비율 제외</span></div>`;
   $('#shootColumns').innerHTML=channels.map(ch=>{
     const arr=state.shoots.filter(x=>x.channel===ch).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
     const limit=shootVisibleCounts[ch]||10,shown=arr.slice(0,limit),remain=Math.max(0,arr.length-limit),next=Math.min(10,remain);
