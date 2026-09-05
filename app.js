@@ -235,23 +235,7 @@ function navigate(id){
     renderMeetingMonth(n.getFullYear(),n.getMonth()+1,week);
   }
   if(id==='calendar')renderCalendar();
-  if(id==='ads'){
-    // 광고 탭은 진입할 때마다 내용을 새로 만들고 이전 탭/검색에서 남은 표시 상태를 제거한다.
-    renderAds();
-    requestAnimationFrame(()=>{
-      const q=String($('#globalSearch')?.value||'').trim().toLowerCase();
-      $$('#adColumns .ad-row').forEach(el=>{
-        el.style.removeProperty('display');
-        if(q&&!el.textContent.toLowerCase().includes(q))el.style.display='none';
-      });
-      const wrap=$('#adColumns');
-      if(wrap){
-        wrap.style.removeProperty('display');
-        wrap.style.removeProperty('visibility');
-        wrap.style.removeProperty('opacity');
-      }
-    });
-  }
+  if(id==='ads')renderAds();
   window.scrollTo({top:0,behavior:'instant'});
 }
 
@@ -573,47 +557,68 @@ function adStatusBadge(status){
 }
 function renderAds(){
   state.ads=Array.isArray(state.ads)?state.ads:[];
-  state.adTargets=state.adTargets||{};
+  state.adTargets=state.adTargets&&typeof state.adTargets==='object'?state.adTargets:{};
 
-  const kpi=$('#adKpi');
-  const columns=$('#adColumns');
-  if(!kpi||!columns)return;
+  const root=$('#adsDashboard');
+  if(!root)return;
 
-  kpi.innerHTML=channels.map(ch=>{
-    const arr=state.ads.filter(x=>x.channel===ch),amt=arr.reduce((s,x)=>s+Number(x.amount||0),0);
+  const q=String($('#globalSearch')?.value||'').trim().toLowerCase();
+
+  const channelBlock=ch=>{
+    const arr=state.ads
+      .filter(x=>x&&x.channel===ch)
+      .sort((a,b)=>String(a.final||'9999-99-99').localeCompare(String(b.final||'9999-99-99')));
+
+    const rows=arr.map(x=>{
+      const searchable=`${x.brand||''} ${x.product||''} ${x.adType||''} ${x.status||''} ${x.assignee||''} ${x.pd||''}`.toLowerCase();
+      const hidden=q&&!searchable.includes(q);
+      const complete=x.status==='업로드 완료'||x.status==='업로드완료';
+      return `<button type="button" class="ad2-row ${complete?'is-complete':''}" data-ad-search="${esc(searchable)}" style="${hidden?'display:none;':''}" onclick="editItem('ads','${x.id}')">
+        <span class="ad2-main">
+          ${adTypeBadge(x.adType)}
+          <strong>${esc(x.brand||'브랜드 미정')}</strong>
+          ${x.product?`<em>${esc(x.product)}</em>`:''}
+        </span>
+        <span class="ad2-meta">
+          <small>${esc(adDisplayMonth(x))}</small>
+          ${adStatusBadge(x.status)}
+        </span>
+      </button>`;
+    }).join('');
+
+    return `<section class="ad2-channel">
+      <div class="ad2-channel-head">
+        <div>${channelPill(ch)}<span>${arr.length}건</span></div>
+      </div>
+      <div class="ad2-list">${rows||'<div class="ad2-empty">등록된 광고가 없어요.</div>'}</div>
+    </section>`;
+  };
+
+  const kpis=channels.map(ch=>{
+    const arr=state.ads.filter(x=>x&&x.channel===ch);
+    const amt=arr.reduce((s,x)=>s+Number(x.amount||0),0);
     const target=Number(state.adTargets[ch]||0);
     const rate=target>0?(amt/target*100):null;
-    return `<div class="kpi ${channelClass[ch]}">
-      ${channelPill(ch)} <b>KPI</b>
-      <div class="ad-kpi-grid">
+    return `<section class="ad2-kpi ${channelClass[ch]}">
+      <div class="ad2-kpi-head">${channelPill(ch)}<b>KPI</b></div>
+      <div class="ad2-kpi-grid">
         <span>진행 건수<strong>${arr.length}건</strong></span>
         <span>진행 금액<strong>${formatAdMoney(amt)}</strong></span>
-        <span class="ad-target-cell" onclick="setAdTarget('${ch}')">목표 금액<strong>${target>0?formatAdMoney(target):'아직 설정 안됨'}</strong><small>클릭해서 설정</small></span>
-        <span>달성률<strong>${rate===null?'—':`${rate.toFixed(1)}%`}</strong>${rate!==null?`<small>${rate>=100?'목표 달성':'진행 중'}</small>`:''}</span>
+        <button type="button" onclick="setAdTarget('${ch}')">목표 금액<strong>${target>0?formatAdMoney(target):'설정 안됨'}</strong><small>클릭해서 설정</small></button>
+        <span>달성률<strong>${rate===null?'—':`${rate.toFixed(1)}%`}</strong><small>${rate===null?'':rate>=100?'목표 달성':'진행 중'}</small></span>
       </div>
-    </div>`;
+    </section>`;
   }).join('');
 
-  columns.innerHTML=`<div class="ad-list-head"><h2>광고 리스트</h2><span>총 ${state.ads.length}건</span></div>
-    <div class="ad-list-columns">
-      ${channels.map(ch=>{
-        const arr=state.ads.filter(x=>x.channel===ch);
-        return `<section class="channel-col ad-col">
-          <h3>${channelPill(ch)}<small>${arr.length}건</small></h3>
-          <div class="ad-list-body">
-            ${arr.length?arr.map(x=>`<article class="ad-row ${channelClass[ch]} ${x.status==='업로드 완료'||x.status==='업로드완료'?'ad-completed':''}" onclick="editItem('ads','${x.id}')">
-              <div>${adTypeBadge(x.adType)}<b>${esc(x.brand||'브랜드 미정')}</b><small>${esc(adDisplayMonth(x))}</small></div>
-              ${adStatusBadge(x.status)}
-            </article>`).join(''):'<div class="empty">등록된 광고가 없어요.</div>'}
-          </div>
-        </section>`;
-      }).join('')}
-    </div>`;
-  const q=String($('#globalSearch')?.value||'').trim().toLowerCase();
-  $$('#adColumns .ad-row').forEach(el=>{
-    el.style.removeProperty('display');
-    if(q&&!el.textContent.toLowerCase().includes(q))el.style.display='none';
-  });
+  root.innerHTML=`
+    <section class="ad2-list-section">
+      <div class="ad2-section-head"><h2>광고 리스트</h2><span>총 ${state.ads.length}건</span></div>
+      <div class="ad2-columns">${channels.map(channelBlock).join('')}</div>
+    </section>
+    <section class="ad2-kpi-section">
+      <div class="ad2-section-head"><h2>KPI</h2></div>
+      <div class="ad2-kpis">${kpis}</div>
+    </section>`;
 }
 window.setAdTarget=ch=>{
   state.adTargets=state.adTargets||{};
@@ -1591,12 +1596,13 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-idea-view]
 document.addEventListener('click',e=>{const b=e.target.closest('[data-notice-view]');if(b){window.setNoticeView(b.dataset.noticeView);}});
 function applyGlobalSearch(){
   const q=String($('#globalSearch')?.value||'').trim().toLowerCase();
-  $$('.member-card,.resource-tr,.resource-memo-card,.doc,.simple-row,.upload-card,.shoot-card,.ad-row,.idea-card').forEach(el=>{
-    if(!q){
-      el.style.removeProperty('display');
-    }else{
-      el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';
-    }
+  $$('.member-card,.resource-tr,.resource-memo-card,.doc,.simple-row,.upload-card,.shoot-card,.idea-card').forEach(el=>{
+    if(!q)el.style.removeProperty('display');
+    else el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';
+  });
+  $$('.ad2-row').forEach(el=>{
+    if(!q)el.style.removeProperty('display');
+    else el.style.display=String(el.dataset.adSearch||el.textContent||'').toLowerCase().includes(q)?'':'none';
   });
 }
 $('#globalSearch').addEventListener('input',applyGlobalSearch);

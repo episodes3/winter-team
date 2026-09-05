@@ -1204,3 +1204,54 @@
   background:#f4f4f1;
   color:#777;
 }
+
+/* V3.72 — 광고 탭 렌더링 전면 재구축 (기존 state.ads/업로드 연동 유지) */
+.ads-dashboard-v2{display:block;width:100%;min-height:120px}
+.ad2-list-section{margin-top:8px}
+.ad2-section-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding-bottom:10px;margin-bottom:14px;border-bottom:1px solid var(--line)
+}
+.ad2-section-head h2{margin:0;font-size:15px;letter-spacing:-.02em}
+.ad2-section-head>span{font-size:9px;color:#999}
+.ad2-columns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:34px}
+.ad2-channel{min-width:0}
+.ad2-channel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.ad2-channel-head>div{display:flex;align-items:center;gap:7px}
+.ad2-channel-head span{font-size:8px;color:#aaa}
+.ad2-list{display:grid}
+.ad2-row{
+  appearance:none;-webkit-appearance:none;width:100%;min-height:48px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 9px;border:0;border-bottom:1px solid #f0f0ed;
+  background:#fff;text-align:left;font:inherit;cursor:pointer
+}
+.ad2-row:hover{background:#fafafa}
+.ad2-row.is-complete .ad2-main strong{text-decoration:line-through;color:#aaa}
+.ad2-main{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:8px;min-width:0}
+.ad2-main strong{font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ad2-main em{grid-column:2;font-style:normal;font-size:8px;color:#999;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ad2-meta{display:flex;align-items:center;gap:7px;flex:0 0 auto}
+.ad2-meta small{font-size:8px;color:#888}
+.ad2-empty{padding:14px 8px;font-size:9px;color:#aaa;border-bottom:1px solid #f0f0ed}
+.ad2-kpi-section{margin-top:36px;padding-top:0}
+.ad2-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:34px}
+.ad2-kpi{min-width:0}
+.ad2-kpi-head{display:flex;align-items:center;gap:6px;margin-bottom:12px}
+.ad2-kpi-head>b{font-size:9px}
+.ad2-kpi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid #eee;border-left:1px solid #eee}
+.ad2-kpi-grid>span,.ad2-kpi-grid>button{
+  min-height:62px;padding:10px;border:0;border-right:1px solid #eee;border-bottom:1px solid #eee;
+  background:#fff;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+  font:inherit;font-size:8px;color:#999;text-align:left
+}
+.ad2-kpi-grid>button{cursor:pointer}
+.ad2-kpi-grid>button:hover{background:#fafafa}
+.ad2-kpi-grid strong{font-size:12px;color:#222;margin-top:4px}
+.ad2-kpi-grid small{font-size:7px;color:#aaa;margin-top:3px}
+@media(max-width:1050px){
+  .ad2-columns,.ad2-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  .ad2-columns,.ad2-kpis{grid-template-columns:1fr}
+}
