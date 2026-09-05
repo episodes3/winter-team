@@ -631,7 +631,8 @@ function currentMeetingWeek(year,month){
 window.openMeetingMonth=(year,month)=>{renderMeetingMonth(year,month,currentMeetingWeek(year,month));};
 
 function sanitizeMeetingRich(html){
-  const box=document.createElement('div');box.innerHTML=String(html||'');
+  const box=document.createElement('div');
+  box.innerHTML=String(html||'').replace(/\r\n?/g,'\n').replace(/\n/g,'<br>');
   const walk=node=>{
     if(node.nodeType===Node.TEXT_NODE)return esc(node.nodeValue||'');
     if(node.nodeType!==Node.ELEMENT_NODE)return '';
@@ -639,10 +640,15 @@ function sanitizeMeetingRich(html){
     const inner=[...node.childNodes].map(walk).join('');
     if(tag==='STRONG'||tag==='B')return `<strong>${inner}</strong>`;
     if(tag==='BR')return '<br>';
-    if(tag==='DIV'||tag==='P')return `${inner}<br>`;
+    if(tag==='DIV'||tag==='P'){
+      return `${inner}${inner.endsWith('<br>')?'':'<br>'}`;
+    }
     return inner;
   };
-  return [...box.childNodes].map(walk).join('').replace(/(?:<br>){3,}/g,'<br><br>').replace(/<br>$/,'');
+  return [...box.childNodes]
+    .map(walk).join('')
+    .replace(/(?:<br>){4,}/g,'<br><br><br>')
+    .replace(/<br>$/,'');
 }
 function meetingPlainTextFromHtml(html){
   const box=document.createElement('div');box.innerHTML=String(html||'');return (box.innerText||box.textContent||'').trim();
@@ -667,7 +673,7 @@ function renderMeetingMonth(year,month,week='1'){
     const icon=obj.format==='check'?`<button type="button" class="meeting-check ${obj.checked?'checked':''}" onclick="event.stopPropagation();toggleMeetingCheck('${selected.id}',${si},${ii})" aria-label="체크">${obj.checked?'✓':''}</button>`:'<span class="meeting-bullet">•</span>';
     const mentions=(obj.mentions||[]).map(m=>`<span class="meeting-mention">@${esc(m)}</span>`).join('');
     const related=obj.related?`<small class="meeting-related">↳ ${esc(obj.related)}</small>`:'';
-    return `<div class="meeting-item ${obj.format==='check'?'check-item':''} ${obj.checked?'checked-item':''}"><span class="meeting-item-icon">${icon}</span><div class="meeting-item-body"><span>${autoLinkHtml(obj.richHtml?sanitizeMeetingRich(obj.richHtml):esc(obj.text||''))}</span>${related}${mentions?`<div class="meeting-mentions-inline">${mentions}</div>`:''}</div><div class="meeting-item-actions"><button onclick="editMeetingItem('${selected.id}',${si},${ii})">수정</button><button onclick="deleteMeetingItem('${selected.id}',${si},${ii})">×</button></div></div>`;
+    return `<div class="meeting-item ${obj.format==='check'?'check-item':''} ${obj.checked?'checked-item':''}"><span class="meeting-item-icon">${icon}</span><div class="meeting-item-body"><span>${obj.richHtml?autoLinkHtml(sanitizeMeetingRich(obj.richHtml)):autoLinkText(obj.text||'')}</span>${related}${mentions?`<div class="meeting-mentions-inline">${mentions}</div>`:''}</div><div class="meeting-item-actions"><button onclick="editMeetingItem('${selected.id}',${si},${ii})">수정</button><button onclick="deleteMeetingItem('${selected.id}',${si},${ii})">×</button></div></div>`;
   };
   $('#meetingDetail').innerHTML=`<div class="meeting-detail-head"><button class="back-btn" onclick="renderMeetingsLanding()">← 뒤로</button><h1>${year}년 ${month}월 회의록</h1></div>
   <div class="week-tabs">${['1','2','3','4','5','6'].map(w=>`<button class="${activeWeek===w?'active':''}" onclick="renderMeetingMonth(${year},${month},'${w}')">${w}주차</button>`).join('')}<button class="week-plus" onclick="addMeetingWeek(${year},${month})">+ 주차</button></div>

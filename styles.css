@@ -1129,3 +1129,22 @@
 @media(max-width:760px){
   .ad-list-columns{grid-template-columns:1fr}
 }
+
+/* V3.66 — 광고 리스트 위 / KPI 아래 */
+#ads #adColumns.ad-list-wrap{
+  margin-top:10px !important;
+  margin-bottom:34px !important;
+}
+#ads #adKpi.ad-kpi{
+  margin-top:0 !important;
+}
+
+/* V3.66 — 회의록 엔터 줄바꿈 표시 */
+.meeting-item-body>span{
+  white-space:normal !important;
+  overflow-wrap:anywhere;
+}
+.meeting-item-body>span br{
+  display:block;
+  content:"";
+}
