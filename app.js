@@ -95,10 +95,16 @@ function normalizeState(saved){
   channels.forEach(ch=>{if(saved.adTargets[ch]===undefined)saved.adTargets[ch]=null;});
   saved.calendarEvents=Array.isArray(saved.calendarEvents)?saved.calendarEvents:[];
   saved.resourceMemos=Array.isArray(saved.resourceMemos)?saved.resourceMemos:[];
-  if(Array.isArray(saved.schedules)){
-    saved.schedules.filter(x=>x&&(x.isLeave||['manual','meeting','leave'].includes(x.type))).forEach(x=>{
-      if(!saved.calendarEvents.some(c=>c.id===x.id))saved.calendarEvents.push({...x});
-    });
+  // Legacy schedules -> calendarEvents migration must run only once.
+  // Otherwise a calendar event deleted by the user gets recreated from the old schedules array
+  // whenever state is normalized again (including Supabase realtime hydration).
+  if(!saved.calendarSchedulesMigrated){
+    if(Array.isArray(saved.schedules)){
+      saved.schedules.filter(x=>x&&(x.isLeave||['manual','meeting','leave'].includes(x.type))).forEach(x=>{
+        if(!saved.calendarEvents.some(c=>c.id===x.id))saved.calendarEvents.push({...x});
+      });
+    }
+    saved.calendarSchedulesMigrated=true;
   }
   return saved;
 }
