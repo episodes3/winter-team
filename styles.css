@@ -1018,3 +1018,11 @@
   .notice-table-date,
   .notice-table-author{font-size:9px}
 }
+
+/* V3.57 Supabase shared sync */
+.cloud-status{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:99px;background:#f1f1ee;color:#888;font-size:9px;font-weight:700;white-space:nowrap}
+.cloud-status:before{content:"";width:6px;height:6px;border-radius:50%;background:#aaa}
+.cloud-status.ok{background:#eef7ef;color:#5f8464}.cloud-status.ok:before{background:#6ea879}
+.cloud-status.saving{background:#f4f4f1;color:#85857f}.cloud-status.saving:before{background:#b1b1aa}
+.cloud-status.error{background:#fff0f0;color:#b26060}.cloud-status.error:before{background:#d66f6f}
+#loginForm button:disabled{opacity:.65;cursor:wait}

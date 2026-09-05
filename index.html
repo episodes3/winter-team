@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=57" />
 </head>
 <body>
   <div id="loginView" class="login-screen">
@@ -44,7 +44,7 @@
     <main class="main">
       <header class="header">
         <div class="search-wrap">⌕ <input id="globalSearch" placeholder="영상 제목, 브랜드, 촬영, 회의록 통합 검색..." /></div>
-        <div class="header-right"><span id="todayLabel"></span><button class="outline" id="exportBtn">백업</button></div>
+        <div class="header-right"><span id="cloudStatus" class="cloud-status">연결 대기</span><span id="todayLabel"></span><button class="outline" id="exportBtn">백업</button></div>
       </header>
 
       <section id="home" class="page active-page">
@@ -178,6 +178,7 @@
     </main>
   </div>
   <div id="modalRoot"></div>
-  <script src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js?v=57"></script>
 </body>
 </html>

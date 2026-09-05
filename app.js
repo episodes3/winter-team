@@ -1,4 +1,14 @@
-const PASSWORD='rnffjrkdb';
+const SUPABASE_URL='https://okkoyevyskroxvvokxfq.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_ntsfG4dS9z5nevHpa2k_1w_YEUgJ5Eb';
+const SUPABASE_EMAIL='episodes.winter@gmail.com';
+const CLOUD_TABLE='dashboard_data';
+const CLOUD_ROW_ID=1;
+const HAD_LOCAL_V3=Boolean(localStorage.getItem('teamDashDataV3'));
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+let cloudReady=false;
+let cloudSaving=false;
+let cloudSaveQueued=false;
+let cloudChannel=null;
 const members=['윈터','파타','다나','에렌','키엘','브루나'];
 const ideaCategories=['패션','뷰티','브이로그','예능','기타'];
 const adManagers=['로건','메이브','젤라'];
@@ -75,33 +85,94 @@ function seed(){
     ]
   };
 }
+function normalizeState(saved){
+  if(!saved||typeof saved!=='object')return seed();
+  saved.ideas=Array.isArray(saved.ideas)?saved.ideas.map(x=>({...x,archived:Boolean(x.archived),comments:Array.isArray(x.comments)?x.comments:[],category:x.category||'기타'})):[];
+  saved.homeTodos=Array.isArray(saved.homeTodos)?saved.homeTodos:[];
+  saved.memberRemoteDays=saved.memberRemoteDays&&typeof saved.memberRemoteDays==='object'?saved.memberRemoteDays:{};
+  members.forEach(m=>{if(!Array.isArray(saved.memberRemoteDays[m]))saved.memberRemoteDays[m]=[];});
+  saved.adTargets=saved.adTargets&&typeof saved.adTargets==='object'?saved.adTargets:{};
+  channels.forEach(ch=>{if(saved.adTargets[ch]===undefined)saved.adTargets[ch]=null;});
+  saved.calendarEvents=Array.isArray(saved.calendarEvents)?saved.calendarEvents:[];
+  saved.resourceMemos=Array.isArray(saved.resourceMemos)?saved.resourceMemos:[];
+  if(Array.isArray(saved.schedules)){
+    saved.schedules.filter(x=>x&&(x.isLeave||['manual','meeting','leave'].includes(x.type))).forEach(x=>{
+      if(!saved.calendarEvents.some(c=>c.id===x.id))saved.calendarEvents.push({...x});
+    });
+  }
+  return saved;
+}
 function load(){
   const saved=JSON.parse(localStorage.getItem('teamDashDataV3')||'null');
-  if(saved){
-    saved.ideas=Array.isArray(saved.ideas)?saved.ideas.map(x=>({...x,archived:Boolean(x.archived),comments:Array.isArray(x.comments)?x.comments:[],category:x.category||'기타'})):[];
-    saved.homeTodos=Array.isArray(saved.homeTodos)?saved.homeTodos:[];
-    saved.memberRemoteDays=saved.memberRemoteDays&&typeof saved.memberRemoteDays==='object'?saved.memberRemoteDays:{};
-    members.forEach(m=>{if(!Array.isArray(saved.memberRemoteDays[m]))saved.memberRemoteDays[m]=[];});
-    saved.adTargets=saved.adTargets&&typeof saved.adTargets==='object'?saved.adTargets:{};
-    channels.forEach(ch=>{if(saved.adTargets[ch]===undefined)saved.adTargets[ch]=null;});
-    saved.calendarEvents=Array.isArray(saved.calendarEvents)?saved.calendarEvents:[];
-    saved.resourceMemos=Array.isArray(saved.resourceMemos)?saved.resourceMemos:[];
-    // V3.20에서 캘린더로 직접 작성했던 일정만 1회 호환해서 불러옴.
-    if(Array.isArray(saved.schedules)){
-      saved.schedules.filter(x=>x&&(x.isLeave||['manual','meeting','leave'].includes(x.type))).forEach(x=>{
-        if(!saved.calendarEvents.some(c=>c.id===x.id)){
-          saved.calendarEvents.push({...x});
-        }
-      });
-    }
-    return saved;
-  }
+  if(saved)return normalizeState(saved);
   const old=JSON.parse(localStorage.getItem('teamDashDataV2')||'null'); const base=seed();
   if(old){['todos','homeTodos','uploads','shoots','ads','meetings','notices','schedules','resources','ideas'].forEach(k=>{if(old[k]?.length)base[k]=old[k].map(x=>({...x,id:x.id||uid()}));});}
-  return base;
+  return normalizeState(base);
 }
 const state=load();
-function save(){localStorage.setItem('teamDashDataV3',JSON.stringify(state));renderAll();}
+function hydrateState(next){
+  const normalized=normalizeState(JSON.parse(JSON.stringify(next||{})));
+  Object.keys(state).forEach(k=>delete state[k]);
+  Object.assign(state,normalized);
+}
+function persistLocal(){localStorage.setItem('teamDashDataV3',JSON.stringify(state));}
+function setCloudStatus(text,tone=''){
+  const el=$('#cloudStatus');if(!el)return;
+  el.textContent=text;el.className=`cloud-status ${tone}`.trim();
+}
+async function pushCloudNow(){
+  if(!cloudReady)return;
+  if(cloudSaving){cloudSaveQueued=true;return;}
+  cloudSaving=true;cloudSaveQueued=false;setCloudStatus('저장 중…','saving');
+  try{
+    const {error}=await supabaseClient.from(CLOUD_TABLE).upsert({id:CLOUD_ROW_ID,data:state},{onConflict:'id'});
+    if(error)throw error;
+    setCloudStatus('동기화됨','ok');
+  }catch(err){console.error(err);setCloudStatus('동기화 오류','error');}
+  finally{
+    cloudSaving=false;
+    if(cloudSaveQueued){cloudSaveQueued=false;pushCloudNow();}
+  }
+}
+function queueCloudSave(){if(cloudReady)pushCloudNow();}
+function save(){persistLocal();renderAll();queueCloudSave();}
+async function loadCloudData(){
+  setCloudStatus('불러오는 중…','saving');
+  const {data,error}=await supabaseClient.from(CLOUD_TABLE).select('id,data').eq('id',CLOUD_ROW_ID).maybeSingle();
+  if(error)throw error;
+  if(data?.data){
+    hydrateState(data.data);persistLocal();renderAll();setCloudStatus('동기화됨','ok');return 'loaded';
+  }
+  if(HAD_LOCAL_V3){
+    const {error:upErr}=await supabaseClient.from(CLOUD_TABLE).upsert({id:CLOUD_ROW_ID,data:state},{onConflict:'id'});
+    if(upErr)throw upErr;
+    setCloudStatus('기존 데이터 이전 완료','ok');return 'migrated';
+  }
+  setCloudStatus('공용 데이터 없음','error');
+  return 'empty';
+}
+function subscribeCloud(){
+  if(cloudChannel)supabaseClient.removeChannel(cloudChannel);
+  cloudChannel=supabaseClient.channel('dashboard-data-sync')
+    .on('postgres_changes',{event:'*',schema:'public',table:CLOUD_TABLE,filter:`id=eq.${CLOUD_ROW_ID}`},payload=>{
+      if(payload.new?.data){hydrateState(payload.new.data);persistLocal();renderAll();setCloudStatus('동기화됨','ok');}
+    }).subscribe();
+}
+async function enterDashboard(){
+  $('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');
+  try{await loadCloudData();cloudReady=true;subscribeCloud();}
+  catch(err){console.error(err);cloudReady=false;setCloudStatus('연결 오류','error');$('#loginError').textContent='공용 데이터 연결에 실패했어요. 잠시 후 다시 시도해주세요.';}
+}
+async function handleDashboardLogin(password){
+  $('#loginError').textContent='';
+  const btn=$('#loginForm button');btn.disabled=true;btn.textContent='연결 중…';
+  try{
+    const {error}=await supabaseClient.auth.signInWithPassword({email:SUPABASE_EMAIL,password});
+    if(error)throw error;
+    await enterDashboard();
+  }catch(err){console.error(err);$('#loginError').textContent='비밀번호가 틀렸거나 로그인에 실패했어요.';}
+  finally{btn.disabled=false;btn.textContent='들어가기';}
+}
 function localDate(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`;}
 function currentYM(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
 function fmtDate(s){if(!s)return '-';const d=new Date(s+'T00:00:00');return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;}
@@ -147,8 +218,8 @@ function autoLinkHtml(html){
 
 function workBadge(s){return `<span class="work-dot ${s}"></span>${esc(s)}`;}
 
-$('#loginForm').addEventListener('submit',e=>{e.preventDefault();if($('#passwordInput').value===PASSWORD){sessionStorage.setItem('dashAuth','1');$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');}else $('#loginError').textContent='비밀번호가 틀렸어요.';});
-if(sessionStorage.getItem('dashAuth')==='1'){$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');}
+$('#loginForm').addEventListener('submit',e=>{e.preventDefault();handleDashboardLogin($('#passwordInput').value);});
+supabaseClient.auth.getSession().then(({data})=>{if(data.session)enterDashboard();});
 $$('#nav button').forEach(btn=>btn.addEventListener('click',()=>navigate(btn.dataset.page)));
 function navigate(id){$$('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));$$('.page').forEach(p=>p.classList.toggle('active-page',p.id===id));if(id==='meetings'){const n=new Date(),week=String(Math.min(5,Math.ceil(n.getDate()/7)));renderMeetingMonth(n.getFullYear(),n.getMonth()+1,week);}if(id==='calendar')renderCalendar();window.scrollTo({top:0,behavior:'instant'});}
 
@@ -549,7 +620,7 @@ function renderMeetingMonth(year,month,week='1'){
   const arr=meetingMonthData(year,month);let selected=arr.find(x=>String(x.week||'1')===String(week));
   if(!selected){
     selected={id:uid(),title:`${month}월 ${week}주차 회의`,date:`${year}-${String(month).padStart(2,'0')}-${String(Math.min(28,(Number(week)-1)*7+1)).padStart(2,'0')}`,week:String(week),sections:meetingSectionDefs.map(x=>({...x,items:[]}))};
-    state.meetings.push(selected);localStorage.setItem('teamDashDataV3',JSON.stringify(state));
+    state.meetings.push(selected);persistLocal();queueCloudSave();
   }
   normalizeMeetingSections(selected);
   const activeWeek=String(selected.week||week);
@@ -578,7 +649,7 @@ window.toggleMeetingCheck=(meetingId,sectionIndex,itemIndex)=>{
   }else{
     raw.checked=!Boolean(raw.checked);
   }
-  localStorage.setItem('teamDashDataV3',JSON.stringify(state));
+  persistLocal();queueCloudSave();
   renderMeetingMonth(new Date(m.date+'T00:00:00').getFullYear(),new Date(m.date+'T00:00:00').getMonth()+1,String(m.week||'1'));
 };
 
@@ -641,7 +712,7 @@ window.deleteMeetingItem=(meetingId,sectionIndex,itemIndex)=>{
     saveMeetingAndStay(meeting);
   });
 };
-function saveMeetingAndStay(m){localStorage.setItem('teamDashDataV3',JSON.stringify(state));const d=new Date(m.date+'T00:00:00');renderMeetingMonth(d.getFullYear(),d.getMonth()+1,String(m.week||'1'));renderHome();}
+function saveMeetingAndStay(m){persistLocal();queueCloudSave();const d=new Date(m.date+'T00:00:00');renderMeetingMonth(d.getFullYear(),d.getMonth()+1,String(m.week||'1'));renderHome();}
 window.renderCurrentMeeting=(meetingId)=>{const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;const d=new Date(m.date+'T00:00:00');renderMeetingMonth(d.getFullYear(),d.getMonth()+1,String(m.week||'1'));};
 window.addMeetingWeek=(year,month)=>{const used=new Set(meetingMonthData(year,month).map(x=>String(x.week)));const w=['1','2','3','4','5'].find(x=>!used.has(x));if(w)renderMeetingMonth(year,month,w);};
 
