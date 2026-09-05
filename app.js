@@ -579,6 +579,7 @@ window.setAdTarget=ch=>{
 };
 
 
+let meetingViewContext=null;
 function meetingMonthData(year,month){return state.meetings.filter(x=>{if(!x.date)return false;const d=new Date(x.date+'T00:00:00');return d.getFullYear()===year&&d.getMonth()+1===month;});}
 function normalizeMeetingSections(meeting){
   meeting.sections=meetingSectionDefs.map(def=>{
@@ -587,11 +588,26 @@ function normalizeMeetingSections(meeting){
   });
   return meeting.sections;
 }
-function renderMeetingsLanding(){
+function renderMeetingsLanding(preserveContext=false){
+  if(!preserveContext)meetingViewContext=null;
   $('#meetingDetail').classList.add('hidden');$('#meetingLanding').classList.remove('hidden');const now=new Date(),year=now.getFullYear(),cur=now.getMonth()+1;
   $('#meetingLanding').innerHTML=`<div class="page-head"><div><h1>회의</h1></div><strong class="meeting-year">${year}년</strong></div><div class="month-grid">${Array.from({length:12},(_,i)=>i+1).map(m=>`<button class="month-tile ${m===cur?'current':''}" onclick="openMeetingMonth(${year},${m})"><strong>${m}월</strong>${m===cur?'<span>이번 달</span>':''}<small>${meetingMonthData(year,m).length?meetingMonthData(year,m).length+'개 회의록':''}</small></button>`).join('')}</div>`;
 }
-window.openMeetingMonth=(year,month)=>{renderMeetingMonth(year,month,'1');};
+function meetingWeekOfMonth(date){
+  const d=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+  const first=new Date(d.getFullYear(),d.getMonth(),1);
+  // Monday=0 ... Sunday=6. The first partial Monday-Sunday block is week 1.
+  const firstOffset=(first.getDay()+6)%7;
+  return Math.min(6,Math.floor((firstOffset+d.getDate()-1)/7)+1);
+}
+function currentMeetingWeek(year,month){
+  const now=new Date();
+  if(now.getFullYear()===Number(year)&&now.getMonth()+1===Number(month)){
+    return String(meetingWeekOfMonth(now));
+  }
+  return '1';
+}
+window.openMeetingMonth=(year,month)=>{renderMeetingMonth(year,month,currentMeetingWeek(year,month));};
 
 function sanitizeMeetingRich(html){
   const box=document.createElement('div');box.innerHTML=String(html||'');
@@ -616,6 +632,7 @@ window.toggleMeetingBold=()=>{
   document.execCommand('bold',false,null);
 };
 function renderMeetingMonth(year,month,week='1'){
+  meetingViewContext={year:Number(year),month:Number(month),week:String(week)};
   $('#meetingLanding').classList.add('hidden');$('#meetingDetail').classList.remove('hidden');
   const arr=meetingMonthData(year,month);let selected=arr.find(x=>String(x.week||'1')===String(week));
   if(!selected){
@@ -632,8 +649,8 @@ function renderMeetingMonth(year,month,week='1'){
     return `<div class="meeting-item ${obj.format==='check'?'check-item':''} ${obj.checked?'checked-item':''}"><span class="meeting-item-icon">${icon}</span><div class="meeting-item-body"><span>${autoLinkHtml(obj.richHtml?sanitizeMeetingRich(obj.richHtml):esc(obj.text||''))}</span>${related}${mentions?`<div class="meeting-mentions-inline">${mentions}</div>`:''}</div><div class="meeting-item-actions"><button onclick="editMeetingItem('${selected.id}',${si},${ii})">수정</button><button onclick="deleteMeetingItem('${selected.id}',${si},${ii})">×</button></div></div>`;
   };
   $('#meetingDetail').innerHTML=`<div class="meeting-detail-head"><button class="back-btn" onclick="renderMeetingsLanding()">← 뒤로</button><h1>${year}년 ${month}월 회의록</h1></div>
-  <div class="week-tabs">${['1','2','3','4','5'].map(w=>`<button class="${activeWeek===w?'active':''}" onclick="renderMeetingMonth(${year},${month},'${w}')">${w}주차</button>`).join('')}<button class="week-plus" onclick="addMeetingWeek(${year},${month})">+ 주차</button></div>
-  <div class="meeting-meta">${esc(selected.date)} 작성 <button class="del" onclick="deleteById('meetings','${selected.id}')">이 주차 삭제</button></div>
+  <div class="week-tabs">${['1','2','3','4','5','6'].map(w=>`<button class="${activeWeek===w?'active':''}" onclick="renderMeetingMonth(${year},${month},'${w}')">${w}주차</button>`).join('')}<button class="week-plus" onclick="addMeetingWeek(${year},${month})">+ 주차</button></div>
+  <div class="meeting-meta">${esc(selected.date)} 작성 <button class="del" onclick="deleteMeetingWeek('${selected.id}')">이 주차 삭제</button></div>
   <div class="meeting-sections">${selected.sections.map((sec,si)=>`<section class="meeting-section ${esc(sec.tone)}">
     <h3>${esc(sec.title)}</h3>
     <div class="meeting-items">${sec.items.length?sec.items.map((it,ii)=>itemHTML(it,ii,si)).join(''):''}</div>
@@ -698,6 +715,45 @@ window.saveMeetingPopup=(meetingId,sectionIndex,itemIndex)=>{
   closeMeetingItemModal();saveMeetingAndStay(m);
 };
 window.editMeetingItem=(meetingId,sectionIndex,itemIndex)=>openMeetingItemModal(meetingId,sectionIndex,itemIndex);
+window.deleteMeetingWeek=(meetingId)=>{
+  const index=state.meetings.findIndex(x=>x.id===meetingId);
+  if(index<0)return;
+  const removed=state.meetings[index];
+  const d=new Date(removed.date+'T00:00:00');
+  const year=d.getFullYear(),month=d.getMonth()+1,removedWeek=Number(removed.week||1);
+  state.meetings.splice(index,1);
+
+  const remaining=meetingMonthData(year,month)
+    .map(x=>Number(x.week||1))
+    .filter(Number.isFinite)
+    .sort((a,b)=>a-b);
+  const nextWeek=remaining.length
+    ? String(remaining.reduce((best,w)=>Math.abs(w-removedWeek)<Math.abs(best-removedWeek)?w:best,remaining[0]))
+    : null;
+
+  persistLocal();
+  if(nextWeek){
+    meetingViewContext={year,month,week:nextWeek};
+    renderMeetingMonth(year,month,nextWeek);
+  }else{
+    meetingViewContext=null;
+    renderMeetingsLanding();
+  }
+  renderHome();
+  queueCloudSave();
+
+  showDeleteUndo('회의록 주차가 삭제되었습니다',()=>{
+    if(!state.meetings.some(x=>x.id===removed.id)){
+      state.meetings.splice(Math.min(index,state.meetings.length),0,removed);
+    }
+    meetingViewContext={year,month,week:String(removed.week||1)};
+    persistLocal();
+    renderMeetingMonth(year,month,String(removed.week||1));
+    renderHome();
+    queueCloudSave();
+  });
+};
+
 window.deleteMeetingItem=(meetingId,sectionIndex,itemIndex)=>{
   const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;
   normalizeMeetingSections(m);
@@ -712,9 +768,16 @@ window.deleteMeetingItem=(meetingId,sectionIndex,itemIndex)=>{
     saveMeetingAndStay(meeting);
   });
 };
-function saveMeetingAndStay(m){persistLocal();queueCloudSave();const d=new Date(m.date+'T00:00:00');renderMeetingMonth(d.getFullYear(),d.getMonth()+1,String(m.week||'1'));renderHome();}
+function saveMeetingAndStay(m){
+  const d=new Date(m.date+'T00:00:00');
+  meetingViewContext={year:d.getFullYear(),month:d.getMonth()+1,week:String(m.week||'1')};
+  persistLocal();
+  renderMeetingMonth(meetingViewContext.year,meetingViewContext.month,meetingViewContext.week);
+  renderHome();
+  queueCloudSave();
+}
 window.renderCurrentMeeting=(meetingId)=>{const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;const d=new Date(m.date+'T00:00:00');renderMeetingMonth(d.getFullYear(),d.getMonth()+1,String(m.week||'1'));};
-window.addMeetingWeek=(year,month)=>{const used=new Set(meetingMonthData(year,month).map(x=>String(x.week)));const w=['1','2','3','4','5'].find(x=>!used.has(x));if(w)renderMeetingMonth(year,month,w);};
+window.addMeetingWeek=(year,month)=>{const used=new Set(meetingMonthData(year,month).map(x=>String(x.week)));const w=['1','2','3','4','5','6'].find(x=>!used.has(x));if(w)renderMeetingMonth(year,month,w);};
 
 
 let ideaView='active';
@@ -1364,7 +1427,15 @@ function openCalendarEventModal(id=null,presetDate=''){
 }
 window.openCalendarEventModal=openCalendarEventModal;
 
-function renderAll(){renderHome();renderCalendar();renderUploads();renderShoots();renderAds();renderIdeas();renderMeetingsLanding();renderResources();renderResourceMemos();renderNotices();}
+function renderAll(){
+  const meetingCtx=meetingViewContext?{...meetingViewContext}:null;
+  renderHome();renderCalendar();renderUploads();renderShoots();renderAds();renderIdeas();
+  renderMeetingsLanding(true);
+  if(meetingCtx){
+    renderMeetingMonth(meetingCtx.year,meetingCtx.month,meetingCtx.week);
+  }
+  renderResources();renderResourceMemos();renderNotices();
+}
 let deleteUndoTimer=null;
 let deleteUndoAction=null;
 

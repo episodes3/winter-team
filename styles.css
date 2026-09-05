@@ -1026,3 +1026,7 @@
 .cloud-status.saving{background:#f4f4f1;color:#85857f}.cloud-status.saving:before{background:#b1b1aa}
 .cloud-status.error{background:#fff0f0;color:#b26060}.cloud-status.error:before{background:#d66f6f}
 #loginForm button:disabled{opacity:.65;cursor:wait}
+
+/* V3.58 - Home notices: title + author only */
+.home-notice-row{grid-template-columns:1fr auto!important;padding-left:2px!important}
+.home-notice-row b{padding-left:0!important}
