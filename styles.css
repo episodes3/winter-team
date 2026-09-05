@@ -1148,3 +1148,59 @@
   display:block;
   content:"";
 }
+
+/* V3.70 — 탭 이동 후 광고 리스트 표시 안정화 */
+#ads.active-page #adColumns,
+#ads.active-page .ad-list-columns,
+#ads.active-page .ad-col,
+#ads.active-page .ad-list-body{
+  visibility:visible !important;
+  opacity:1 !important;
+}
+#ads.active-page #adColumns{
+  display:block !important;
+}
+#ads.active-page .ad-list-columns{
+  display:grid !important;
+}
+#ads.active-page .ad-list-body{
+  display:grid !important;
+}
+
+/* V3.71 — 회의 연관 아이템 태그 */
+.meeting-related-chip{
+  display:flex;
+  width:max-content;
+  max-width:100%;
+  align-items:center;
+  gap:5px;
+  margin-top:7px;
+  padding:4px 9px;
+  border-radius:7px;
+  font-size:10px;
+  font-weight:700;
+  line-height:1.35;
+  white-space:normal;
+  word-break:keep-all;
+  overflow-wrap:anywhere;
+}
+.meeting-related-chip > span{
+  flex:0 0 auto;
+  font-size:11px;
+}
+.meeting-related-chip.joo{
+  background:#eef8ff;
+  color:#3e8fc3;
+}
+.meeting-related-chip.hye{
+  background:#fff0f6;
+  color:#cf5f8d;
+}
+.meeting-related-chip.dow{
+  background:#eef9f0;
+  color:#4b9760;
+}
+.meeting-related-chip.all{
+  background:#f4f4f1;
+  color:#777;
+}

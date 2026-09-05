@@ -227,7 +227,33 @@ function workBadge(s){return `<span class="work-dot ${s}"></span>${esc(s)}`;}
 $('#loginForm').addEventListener('submit',e=>{e.preventDefault();handleDashboardLogin($('#passwordInput').value);});
 supabaseClient.auth.getSession().then(({data})=>{if(data.session)enterDashboard();});
 $$('#nav button').forEach(btn=>btn.addEventListener('click',()=>navigate(btn.dataset.page)));
-function navigate(id){$$('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));$$('.page').forEach(p=>p.classList.toggle('active-page',p.id===id));if(id==='meetings'){const n=new Date(),week=String(Math.min(5,Math.ceil(n.getDate()/7)));renderMeetingMonth(n.getFullYear(),n.getMonth()+1,week);}if(id==='calendar')renderCalendar();if(id==='ads'){requestAnimationFrame(()=>renderAds());}window.scrollTo({top:0,behavior:'instant'});}
+function navigate(id){
+  $$('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
+  $$('.page').forEach(p=>p.classList.toggle('active-page',p.id===id));
+  if(id==='meetings'){
+    const n=new Date(),week=String(Math.min(5,Math.ceil(n.getDate()/7)));
+    renderMeetingMonth(n.getFullYear(),n.getMonth()+1,week);
+  }
+  if(id==='calendar')renderCalendar();
+  if(id==='ads'){
+    // 광고 탭은 진입할 때마다 내용을 새로 만들고 이전 탭/검색에서 남은 표시 상태를 제거한다.
+    renderAds();
+    requestAnimationFrame(()=>{
+      const q=String($('#globalSearch')?.value||'').trim().toLowerCase();
+      $$('#adColumns .ad-row').forEach(el=>{
+        el.style.removeProperty('display');
+        if(q&&!el.textContent.toLowerCase().includes(q))el.style.display='none';
+      });
+      const wrap=$('#adColumns');
+      if(wrap){
+        wrap.style.removeProperty('display');
+        wrap.style.removeProperty('visibility');
+        wrap.style.removeProperty('opacity');
+      }
+    });
+  }
+  window.scrollTo({top:0,behavior:'instant'});
+}
 
 function renderHome(){
   const now=new Date(),tom=new Date();tom.setDate(now.getDate()+1);const weekEnd=new Date();weekEnd.setDate(now.getDate()+7);const td=localDate(now),tm=localDate(tom);
@@ -575,7 +601,7 @@ function renderAds(){
         return `<section class="channel-col ad-col">
           <h3>${channelPill(ch)}<small>${arr.length}건</small></h3>
           <div class="ad-list-body">
-            ${arr.length?arr.map(x=>`<article class="ad-row ${channelClass[ch]} ${x.status==='업로드 완료'?'ad-completed':''}" onclick="editItem('ads','${x.id}')">
+            ${arr.length?arr.map(x=>`<article class="ad-row ${channelClass[ch]} ${x.status==='업로드 완료'||x.status==='업로드완료'?'ad-completed':''}" onclick="editItem('ads','${x.id}')">
               <div>${adTypeBadge(x.adType)}<b>${esc(x.brand||'브랜드 미정')}</b><small>${esc(adDisplayMonth(x))}</small></div>
               ${adStatusBadge(x.status)}
             </article>`).join(''):'<div class="empty">등록된 광고가 없어요.</div>'}
@@ -583,6 +609,11 @@ function renderAds(){
         </section>`;
       }).join('')}
     </div>`;
+  const q=String($('#globalSearch')?.value||'').trim().toLowerCase();
+  $$('#adColumns .ad-row').forEach(el=>{
+    el.style.removeProperty('display');
+    if(q&&!el.textContent.toLowerCase().includes(q))el.style.display='none';
+  });
 }
 window.setAdTarget=ch=>{
   state.adTargets=state.adTargets||{};
@@ -664,6 +695,14 @@ window.toggleMeetingBold=()=>{
   editor.focus();
   document.execCommand('bold',false,null);
 };
+function meetingRelatedChip(value){
+  const text=String(value||'').trim();
+  if(!text)return '';
+  const match=text.match(/^\[([^\]]+)\]/);
+  const ch=match?.[1]||'';
+  const cls=channelClass[ch]||'all';
+  return `<small class="meeting-related-chip ${cls}"><span>🎬</span>${esc(text)}</small>`;
+}
 function renderMeetingMonth(year,month,week='1'){
   meetingViewContext={year:Number(year),month:Number(month),week:String(week)};
   $('#meetingLanding').classList.add('hidden');$('#meetingDetail').classList.remove('hidden');
@@ -678,7 +717,7 @@ function renderMeetingMonth(year,month,week='1'){
     const obj=typeof it==='string'?{text:it,format:'bullet',mentions:[],related:''}:it;
     const icon=obj.format==='check'?`<button type="button" class="meeting-check ${obj.checked?'checked':''}" onclick="event.stopPropagation();toggleMeetingCheck('${selected.id}',${si},${ii})" aria-label="체크">${obj.checked?'✓':''}</button>`:'<span class="meeting-bullet">•</span>';
     const mentions=(obj.mentions||[]).map(m=>`<span class="meeting-mention">@${esc(m)}</span>`).join('');
-    const related=obj.related?`<small class="meeting-related">↳ ${esc(obj.related)}</small>`:'';
+    const related=obj.related?meetingRelatedChip(obj.related):'';
     return `<div class="meeting-item ${obj.format==='check'?'check-item':''} ${obj.checked?'checked-item':''}"><span class="meeting-item-icon">${icon}</span><div class="meeting-item-body"><span>${obj.richHtml?autoLinkHtml(sanitizeMeetingRich(obj.richHtml)):autoLinkText(obj.text||'')}</span>${related}${mentions?`<div class="meeting-mentions-inline">${mentions}</div>`:''}</div><div class="meeting-item-actions"><button onclick="editMeetingItem('${selected.id}',${si},${ii})">수정</button><button onclick="deleteMeetingItem('${selected.id}',${si},${ii})">×</button></div></div>`;
   };
   $('#meetingDetail').innerHTML=`<div class="meeting-detail-head"><button class="back-btn" onclick="renderMeetingsLanding()">← 뒤로</button><h1>${year}년 ${month}월 회의록</h1></div>
@@ -1550,7 +1589,17 @@ window.editItem=(key,id)=>openModal({todos:'todoModal',uploads:'uploadModal',sho
 window.openModal=openModal;
 document.addEventListener('click',e=>{const b=e.target.closest('[data-idea-view]');if(b){window.setIdeaView(b.dataset.ideaView);}});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-notice-view]');if(b){window.setNoticeView(b.dataset.noticeView);}});
-$('#globalSearch').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();$$('.member-card,.resource-tr,.resource-memo-card,.doc,.simple-row,.upload-card,.shoot-card,.ad-row,.idea-card').forEach(el=>el.style.display=!q||el.textContent.toLowerCase().includes(q)?'':'none');});
+function applyGlobalSearch(){
+  const q=String($('#globalSearch')?.value||'').trim().toLowerCase();
+  $$('.member-card,.resource-tr,.resource-memo-card,.doc,.simple-row,.upload-card,.shoot-card,.ad-row,.idea-card').forEach(el=>{
+    if(!q){
+      el.style.removeProperty('display');
+    }else{
+      el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';
+    }
+  });
+}
+$('#globalSearch').addEventListener('input',applyGlobalSearch);
 $('#exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='우리팀-잘-굴러가유-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);};
 $('#todayLabel').textContent=new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date());
 window.addEventListener('focus',()=>renderHome());
