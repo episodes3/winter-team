@@ -706,6 +706,16 @@ function meetingRelatedChip(value){
   const cls=channelClass[ch]||'all';
   return `<small class="meeting-related-chip ${cls}"><span>🎬</span>${esc(text)}</small>`;
 }
+
+function meetingMentionChips(mentions){
+  const arr=Array.isArray(mentions)?mentions:String(mentions||'').split(',').map(v=>v.trim()).filter(Boolean);
+  if(!arr.length)return '';
+  return `<div class="meeting-mentions-inline">${arr.map(name=>{
+    const col=memberColors[name];
+    const style=col?` style="--mention-bg:${col.bg};--mention-line:${col.line}"`:'';
+    return `<small class="meeting-mention-chip"${style}><span>@</span>${esc(name)}</small>`;
+  }).join('')}</div>`;
+}
 function renderMeetingMonth(year,month,week='1'){
   meetingViewContext={year:Number(year),month:Number(month),week:String(week)};
   $('#meetingLanding').classList.add('hidden');$('#meetingDetail').classList.remove('hidden');
