@@ -231,8 +231,8 @@ function navigate(id){
   $$('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
   $$('.page').forEach(p=>p.classList.toggle('active-page',p.id===id));
   if(id==='meetings'){
-    const n=new Date(),week=String(Math.min(5,Math.ceil(n.getDate()/7)));
-    renderMeetingMonth(n.getFullYear(),n.getMonth()+1,week);
+    const n=new Date();
+    renderMeetingMonth(n.getFullYear(),n.getMonth()+1,currentMeetingWeek(n.getFullYear(),n.getMonth()+1));
   }
   if(id==='calendar')renderCalendar();
   if(id==='ads')renderAds();
@@ -241,14 +241,12 @@ function navigate(id){
 
 function renderHome(){
   const now=new Date(),tom=new Date();tom.setDate(now.getDate()+1);const weekEnd=new Date();weekEnd.setDate(now.getDate()+7);const td=localDate(now),tm=localDate(tom);
-  const scheduleItems=[...state.schedules.map(x=>({...x,kind:'일정'})),...state.shoots.map(x=>({...x,kind:'촬영'})),...state.uploads.map(x=>({...x,kind:'업로드'}))];
+  const calendarItems=(state.calendarEvents||[]).filter(x=>x&&x.date).map(x=>({...x,kind:x.type==='leave'?'연차':x.type==='meeting'?'회의':'일정'}));
   const renderSchedule=(arr,msg)=>arr.length?arr.slice(0,5).map(x=>`<div class="schedule-item ${channelClass[x.channel]||''}"><span class="bar"></span><div><strong>${esc(x.title)}</strong><small>${esc(x.channel||'전체')} · ${esc(x.kind)}</small></div><time>${shootDates(x).map(d=>fmtDate(d.date)+(d.memo?` ${esc(d.memo)}`:'')).join(' · ')||'-'}</time></div>`).join(''):`<div class="empty">${msg}</div>`;
-  const today=scheduleItems.filter(x=>x.date===td), tomorrow=scheduleItems.filter(x=>x.date===tm), week=state.uploads.filter(x=>x.date&&new Date(x.date+'T00:00:00')>=new Date(td+'T00:00:00')&&new Date(x.date+'T00:00:00')<=weekEnd).sort((a,b)=>a.date.localeCompare(b.date));
+  const today=calendarItems.filter(x=>x.date===td), tomorrow=calendarItems.filter(x=>x.date===tm), week=state.uploads.filter(x=>x.date&&new Date(x.date+'T00:00:00')>=new Date(td+'T00:00:00')&&new Date(x.date+'T00:00:00')<=weekEnd).sort((a,b)=>a.date.localeCompare(b.date));
   $('#todayCount').textContent=today.length;$('#tomorrowCount').textContent=tomorrow.length;$('#weekCount').textContent=week.length;
   $('#todaySchedule').innerHTML=renderSchedule(today,'오늘 일정이 없어요');$('#tomorrowSchedule').innerHTML=renderSchedule(tomorrow,'예정된 일정이 없어요');$('#weekUploads').innerHTML=renderSchedule(week.map(x=>({...x,kind:'업로드'})),'이번 주 업로드가 없어요');
   renderHomeTodos();
-  const overdue=state.ads.filter(x=>x.final&&x.final<td&&x.status!=='업로드완료');
-  $('#homeAlert').classList.toggle('hidden',!overdue.length);if(overdue.length)$('#homeAlert').innerHTML=`<b>주의 필요</b><span>${overdue.length}건 마감 지남</span><strong>📣 ${esc(overdue[0].brand)} 최종본 전달</strong><em>광고</em>`;
   $('#memberBoard').innerHTML=members.map(m=>{
     const col=memberColors[m];
     const memberLeaveEvents=(state.calendarEvents||[]).filter(e=>e.type==='leave'&&(e.member===m||String(e.title||'').startsWith(m+' ')));
