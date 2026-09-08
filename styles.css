@@ -1167,44 +1167,6 @@
   display:grid !important;
 }
 
-/* V3.71 — 회의 연관 아이템 태그 */
-.meeting-related-chip{
-  display:flex;
-  width:max-content;
-  max-width:100%;
-  align-items:center;
-  gap:5px;
-  margin-top:7px;
-  padding:4px 9px;
-  border-radius:7px;
-  font-size:10px;
-  font-weight:700;
-  line-height:1.35;
-  white-space:normal;
-  word-break:keep-all;
-  overflow-wrap:anywhere;
-}
-.meeting-related-chip > span{
-  flex:0 0 auto;
-  font-size:11px;
-}
-.meeting-related-chip.joo{
-  background:#eef8ff;
-  color:#3e8fc3;
-}
-.meeting-related-chip.hye{
-  background:#fff0f6;
-  color:#cf5f8d;
-}
-.meeting-related-chip.dow{
-  background:#eef9f0;
-  color:#4b9760;
-}
-.meeting-related-chip.all{
-  background:#f4f4f1;
-  color:#777;
-}
-
 /* V3.72 — 광고 탭 렌더링 전면 재구축 (기존 state.ads/업로드 연동 유지) */
 .ads-dashboard-v2{display:block;width:100%;min-height:120px}
 .ad2-list-section{margin-top:8px}
@@ -1254,28 +1216,6 @@
 }
 @media(max-width:760px){
   .ad2-columns,.ad2-kpis{grid-template-columns:1fr}
-}
-
-/* V3.73 — 회의 연관 아이템 컴팩트 한 줄 표기 */
-.meeting-related-chip{
-  display:inline-flex !important;
-  width:auto !important;
-  max-width:100% !important;
-  align-items:center !important;
-  gap:4px !important;
-  margin-top:4px !important;
-  padding:2px 6px !important;
-  border-radius:4px !important;
-  font-size:9px !important;
-  font-weight:600 !important;
-  line-height:1.35 !important;
-  white-space:nowrap !important;
-  overflow:hidden !important;
-  text-overflow:ellipsis !important;
-  vertical-align:top !important;
-}
-.meeting-related-chip > span{
-  font-size:9px !important;
 }
 
 /* V3.74 — 광고 분류 태그 컬러 + KPI 채널 컬러 */
@@ -1390,29 +1330,3 @@
   .ad2-meta{flex:0 0 auto !important;}
 }
 
-/* V3.81 — 회의 언급을 연관 아이템처럼 작은 태그로 표시 */
-.meeting-mentions-inline{
-  display:flex !important;
-  flex-wrap:wrap;
-  gap:4px;
-  margin-top:4px;
-}
-.meeting-mention-chip{
-  display:inline-flex;
-  align-items:center;
-  gap:2px;
-  width:max-content;
-  max-width:100%;
-  padding:2px 6px;
-  border-radius:4px;
-  background:var(--mention-bg,#f4f4f1);
-  color:var(--mention-line,#777);
-  font-size:9px;
-  font-weight:600;
-  line-height:1.35;
-  white-space:nowrap;
-}
-.meeting-mention-chip > span{
-  font-size:9px;
-  font-weight:800;
-}

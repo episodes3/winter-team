@@ -33,7 +33,11 @@ const channelLabel={'주우재':'주우재','이혜영':'이혜영','도운':'�
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-function addDaysISO(n){const d=new Date();d.setDate(d.getDate()+n);return localDate(d)}
+function addDaysISO(n){
+  const p=kstParts();
+  const d=new Date(Date.UTC(Number(p.year),Number(p.month)-1,Number(p.day)+Number(n||0)));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+}
 function seed(){
   return {
     memberStatus:Object.fromEntries(members.map((m,i)=>[m,i===3?'연차':(i===1||i===5?'재택중':'근무중')])),
@@ -179,8 +183,19 @@ async function handleDashboardLogin(password){
   }catch(err){console.error(err);$('#loginError').textContent='비밀번호가 틀렸거나 로그인에 실패했어요.';}
   finally{btn.disabled=false;btn.textContent='들어가기';}
 }
-function localDate(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`;}
-function currentYM(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+function kstParts(d=new Date()){
+  const parts=new Intl.DateTimeFormat('en-CA',{
+    timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false
+  }).formatToParts(d);
+  return Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+}
+function kstCalendarDate(d=new Date()){
+  const p=kstParts(d);
+  return new Date(Number(p.year),Number(p.month)-1,Number(p.day));
+}
+function localDate(d=new Date()){const p=kstParts(d);return `${p.year}-${p.month}-${p.day}`;}
+function currentYM(){const p=kstParts();return `${p.year}-${p.month}`;}
 function fmtDate(s){if(!s)return '-';const d=new Date(s+'T00:00:00');return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;}
 function channelPill(ch){return `<span class="channel-pill ${channelClass[ch]||'all'}">${esc(ch)}</span>`;}
 function statusBadge(s){return `<span class="status ${esc(s)}">${esc(s)}</span>`;}
@@ -240,7 +255,7 @@ function navigate(id){
 }
 
 function renderHome(){
-  const now=new Date(),tom=new Date();tom.setDate(now.getDate()+1);const weekEnd=new Date();weekEnd.setDate(now.getDate()+7);const td=localDate(now),tm=localDate(tom);
+  const now=kstCalendarDate(),tom=new Date(now);tom.setDate(now.getDate()+1);const weekEnd=new Date(now);weekEnd.setDate(now.getDate()+7);const td=localDate(),tm=`${tom.getFullYear()}-${String(tom.getMonth()+1).padStart(2,'0')}-${String(tom.getDate()).padStart(2,'0')}`;
   const calendarItems=(state.calendarEvents||[]).filter(x=>x&&x.date).map(x=>({...x,kind:x.type==='leave'?'연차':x.type==='meeting'?'회의':'일정'}));
   const renderSchedule=(arr,msg)=>arr.length?arr.slice(0,5).map(x=>`<div class="schedule-item ${channelClass[x.channel]||''}"><span class="bar"></span><div><strong>${esc(x.title)}</strong><small>${esc(x.channel||'전체')} · ${esc(x.kind)}</small></div><time>${shootDates(x).map(d=>fmtDate(d.date)+(d.memo?` ${esc(d.memo)}`:'')).join(' · ')||'-'}</time></div>`).join(''):`<div class="empty">${msg}</div>`;
   const today=calendarItems.filter(x=>x.date===td), tomorrow=calendarItems.filter(x=>x.date===tm), week=state.uploads.filter(x=>x.date&&new Date(x.date+'T00:00:00')>=new Date(td+'T00:00:00')&&new Date(x.date+'T00:00:00')<=weekEnd).sort((a,b)=>a.date.localeCompare(b.date));
@@ -651,7 +666,7 @@ function normalizeMeetingSections(meeting){
 }
 function renderMeetingsLanding(preserveContext=false){
   if(!preserveContext)meetingViewContext=null;
-  $('#meetingDetail').classList.add('hidden');$('#meetingLanding').classList.remove('hidden');const now=new Date(),year=now.getFullYear(),cur=now.getMonth()+1;
+  $('#meetingDetail').classList.add('hidden');$('#meetingLanding').classList.remove('hidden');const now=kstCalendarDate(),year=now.getFullYear(),cur=now.getMonth()+1;
   $('#meetingLanding').innerHTML=`<div class="page-head"><div><h1>회의</h1></div><strong class="meeting-year">${year}년</strong></div><div class="month-grid">${Array.from({length:12},(_,i)=>i+1).map(m=>`<button class="month-tile ${m===cur?'current':''}" onclick="openMeetingMonth(${year},${m})"><strong>${m}월</strong>${m===cur?'<span>이번 달</span>':''}<small>${meetingMonthData(year,m).length?meetingMonthData(year,m).length+'개 회의록':''}</small></button>`).join('')}</div>`;
 }
 function meetingWeekOfMonth(date){
@@ -662,7 +677,7 @@ function meetingWeekOfMonth(date){
   return Math.min(6,Math.floor((firstOffset+d.getDate()-1)/7)+1);
 }
 function currentMeetingWeek(year,month){
-  const now=new Date();
+  const now=kstCalendarDate();
   if(now.getFullYear()===Number(year)&&now.getMonth()+1===Number(month)){
     return String(meetingWeekOfMonth(now));
   }
@@ -698,24 +713,6 @@ window.toggleMeetingBold=()=>{
   editor.focus();
   document.execCommand('bold',false,null);
 };
-function meetingRelatedChip(value){
-  const text=String(value||'').trim();
-  if(!text)return '';
-  const match=text.match(/^\[([^\]]+)\]/);
-  const ch=match?.[1]||'';
-  const cls=channelClass[ch]||'all';
-  return `<small class="meeting-related-chip ${cls}"><span>🎬</span>${esc(text)}</small>`;
-}
-
-function meetingMentionChips(mentions){
-  const arr=Array.isArray(mentions)?mentions:String(mentions||'').split(',').map(v=>v.trim()).filter(Boolean);
-  if(!arr.length)return '';
-  return `<div class="meeting-mentions-inline">${arr.map(name=>{
-    const col=memberColors[name];
-    const style=col?` style="--mention-bg:${col.bg};--mention-line:${col.line}"`:'';
-    return `<small class="meeting-mention-chip"${style}><span>@</span>${esc(name)}</small>`;
-  }).join('')}</div>`;
-}
 function renderMeetingMonth(year,month,week='1'){
   meetingViewContext={year:Number(year),month:Number(month),week:String(week)};
   $('#meetingLanding').classList.add('hidden');$('#meetingDetail').classList.remove('hidden');
@@ -729,9 +726,7 @@ function renderMeetingMonth(year,month,week='1'){
   const itemHTML=(it,ii,si)=>{
     const obj=typeof it==='string'?{text:it,format:'bullet',mentions:[],related:''}:it;
     const icon=obj.format==='check'?`<button type="button" class="meeting-check ${obj.checked?'checked':''}" onclick="event.stopPropagation();toggleMeetingCheck('${selected.id}',${si},${ii})" aria-label="체크">${obj.checked?'✓':''}</button>`:'<span class="meeting-bullet">•</span>';
-    const mentions=(obj.mentions||[]).map(m=>`<span class="meeting-mention">@${esc(m)}</span>`).join('');
-    const related=obj.related?meetingRelatedChip(obj.related):'';
-    return `<div class="meeting-item ${obj.format==='check'?'check-item':''} ${obj.checked?'checked-item':''}"><span class="meeting-item-icon">${icon}</span><div class="meeting-item-body"><span>${obj.richHtml?autoLinkHtml(sanitizeMeetingRich(obj.richHtml)):autoLinkText(obj.text||'')}</span>${related}${mentions?`<div class="meeting-mentions-inline">${mentions}</div>`:''}</div><div class="meeting-item-actions"><button onclick="editMeetingItem('${selected.id}',${si},${ii})">수정</button><button onclick="deleteMeetingItem('${selected.id}',${si},${ii})">×</button></div></div>`;
+    return `<div class="meeting-item ${obj.format==='check'?'check-item':''} ${obj.checked?'checked-item':''}"><span class="meeting-item-icon">${icon}</span><div class="meeting-item-body"><span>${obj.richHtml?autoLinkHtml(sanitizeMeetingRich(obj.richHtml)):autoLinkText(obj.text||'')}</span></div><div class="meeting-item-actions"><button onclick="editMeetingItem('${selected.id}',${si},${ii})">수정</button><button onclick="deleteMeetingItem('${selected.id}',${si},${ii})">×</button></div></div>`;
   };
   $('#meetingDetail').innerHTML=`<div class="meeting-detail-head"><button class="back-btn" onclick="renderMeetingsLanding()">← 뒤로</button><h1>${year}년 ${month}월 회의록</h1></div>
   <div class="week-tabs">${['1','2','3','4','5','6'].map(w=>`<button class="${activeWeek===w?'active':''}" onclick="renderMeetingMonth(${year},${month},'${w}')">${w}주차</button>`).join('')}<button class="week-plus" onclick="addMeetingWeek(${year},${month})">+ 주차</button></div>
@@ -755,55 +750,33 @@ window.toggleMeetingCheck=(meetingId,sectionIndex,itemIndex)=>{
   renderMeetingMonth(new Date(m.date+'T00:00:00').getFullYear(),new Date(m.date+'T00:00:00').getMonth()+1,String(m.week||'1'));
 };
 
-function meetingRelatedOptions(currentRelated=''){
-  const today=localDate();
-  const uploads=(state.uploads||[])
-    .filter(x=>x&&x.date&&x.date>=today)
-    .sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.title||'').localeCompare(String(b.title||'')))
-    .map(x=>({
-      value:`[${x.channel||'채널 미정'}] ${x.title||'제목 없음'}`,
-      label:`[${x.channel||'채널 미정'}] ${x.title||'제목 없음'}`
-    }));
-
-  // 기존 회의록에 이미 연결된 값은 업로드일이 지났더라도 수정 시 보존할 수 있게 남겨둠.
-  if(currentRelated&&!uploads.some(o=>o.value===currentRelated)){
-    uploads.unshift({value:currentRelated,label:`${currentRelated} (기존)`});
-  }
-  return uploads;
-}
 window.openMeetingItemModal=(meetingId,sectionIndex,itemIndex=null)=>{
   const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;normalizeMeetingSections(m);
   const sec=m.sections[sectionIndex];const raw=itemIndex===null?null:sec.items[itemIndex];
-  const current=typeof raw==='string'?{text:raw,richHtml:esc(raw),format:'bullet',related:'',mentions:[]}:({...raw}); current.richHtml=current.richHtml||esc(current.text||'');
-  const mentions=new Set(current.mentions||[]);
-  const relatedOptions=meetingRelatedOptions(current.related||'');
+  const current=typeof raw==='string'?{text:raw,richHtml:esc(raw),format:'bullet'}:({...raw}); current.richHtml=current.richHtml||esc(current.text||'');
   $('#modalRoot').innerHTML=`<div class="modal-backdrop meeting-modal-backdrop"><div class="meeting-item-modal">
     <div class="meeting-popup-head"><h3>${itemIndex===null?'항목 추가':'항목 수정'}</h3><button class="icon-btn" onclick="closeMeetingItemModal()">×</button></div>
     <div class="meeting-popup-group"><label>형식</label><div class="format-options">
       <label><input type="radio" name="meetingFormat" value="bullet" ${current.format!=='check'?'checked':''}><span>● 불릿 <em>(아이디어)</em></span></label>
       <label><input type="radio" name="meetingFormat" value="check" ${current.format==='check'?'checked':''}><span>□ 체크박스 <em>(할일)</em></span></label>
     </div></div>
-    <div class="meeting-popup-group"><label>연관 아이템 <em>(예정된 업로드만 표시)</em></label><select id="meetingRelated"><option value="">— 미지정 —</option>${relatedOptions.map(o=>`<option value="${esc(o.value)}" ${o.value===current.related?'selected':''}>${esc(o.label)}</option>`).join('')}</select></div>
     <div class="meeting-popup-group"><label>내용 <em>· 글자를 선택한 뒤 B를 누르면 굵게 표시돼요</em></label>
       <div class="meeting-editor-wrap">
         <div class="meeting-editor-toolbar"><button type="button" class="meeting-bold-btn" onclick="toggleMeetingBold()" title="굵게"><strong>B</strong></button></div>
         <div id="meetingItemEditor" class="meeting-rich-editor" contenteditable="true" data-placeholder="회의 내용을 자유롭게 적어주세요">${sanitizeMeetingRich(current.richHtml||esc(current.text||''))}</div>
       </div>
     </div>
-    <div class="meeting-popup-group"><label>멘션 <em>(클릭해서 추가)</em></label><div class="mention-picker">${members.map(name=>`<button type="button" class="mention-chip ${mentions.has(name)?'active':''}" data-name="${esc(name)}" onclick="toggleMeetingMention(this)">@${esc(name)}</button>`).join('')}</div></div>
     <div class="meeting-popup-actions"><button class="outline" onclick="closeMeetingItemModal()">취소</button><button class="accent-btn" onclick="saveMeetingPopup('${meetingId}',${sectionIndex},${itemIndex===null?'null':itemIndex})">저장</button></div>
   </div></div>`;
   setTimeout(()=>$('#meetingItemEditor')?.focus(),30);
 };
-window.toggleMeetingMention=btn=>btn.classList.toggle('active');
 window.closeMeetingItemModal=()=>{$('#modalRoot').innerHTML='';};
 window.saveMeetingPopup=(meetingId,sectionIndex,itemIndex)=>{
   const editor=$('#meetingItemEditor');const richHtml=sanitizeMeetingRich(editor?.innerHTML||'');const text=meetingPlainTextFromHtml(richHtml);if(!text){editor?.focus();return;}
   const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;normalizeMeetingSections(m);
   const format=document.querySelector('input[name="meetingFormat"]:checked')?.value||'bullet';
-  const related=$('#meetingRelated')?.value||'';
-  const mentions=$$('.mention-chip.active').map(x=>x.dataset.name);
-  const obj={text,richHtml,format,related,mentions};
+  const existing=itemIndex===null||itemIndex==='null'?null:m.sections[sectionIndex].items[Number(itemIndex)];
+  const obj={text,richHtml,format,checked:format==='check'&&existing&&typeof existing==='object'?Boolean(existing.checked):false};
   if(itemIndex===null||itemIndex==='null')m.sections[sectionIndex].items.push(obj);else m.sections[sectionIndex].items[Number(itemIndex)]=obj;
   closeMeetingItemModal();saveMeetingAndStay(m);
 };
