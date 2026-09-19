@@ -803,8 +803,6 @@ window.openMeetingItemModal=(meetingId,sectionIndex,itemIndex=null)=>{
           <button type="button" class="meeting-tool-btn" onclick="toggleMeetingUnderline()" title="밑줄"><u>U</u></button>
           <button type="button" class="meeting-tool-btn" onclick="toggleMeetingStrike()" title="취소선"><s>S</s></button>
           <span class="meeting-toolbar-sep"></span>
-          <button type="button" class="meeting-tool-btn wide" onclick="toggleMeetingList()" title="불릿 목록">• 목록</button>
-          <button type="button" class="meeting-tool-btn wide" onclick="insertMeetingCheckbox()" title="체크박스">☐ 체크</button>
           <button type="button" class="meeting-tool-btn wide" onclick="addMeetingLink()" title="링크 (⌘/Ctrl+K)">🔗 링크</button>
           <span class="meeting-toolbar-spacer"></span>
           <button type="button" class="meeting-tool-btn" onclick="meetingEditorCommand('undo')" title="실행 취소 (⌘/Ctrl+Z)">↶</button>

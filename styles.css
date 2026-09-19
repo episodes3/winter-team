@@ -1350,3 +1350,9 @@
 .meeting-rich-editor u,.meeting-item-body u{text-underline-offset:2px}
 .meeting-rich-editor s,.meeting-item-body s{opacity:.7}
 @media(max-width:760px){.meeting-toolbar-spacer{display:none}.meeting-editor-help{gap:7px}.meeting-tool-btn.wide{font-size:11px}}
+
+/* Meeting editor V4.1 — toolbar stays on one line */
+.meeting-editor-toolbar{flex-wrap:nowrap!important;overflow-x:auto;white-space:nowrap}
+.meeting-size-select{width:auto!important;min-width:72px;flex:0 0 auto}
+.meeting-tool-btn,.meeting-toolbar-sep{flex:0 0 auto}
+@media(max-width:760px){.meeting-editor-toolbar{flex-wrap:nowrap!important;overflow-x:auto}.meeting-size-select{min-width:68px}}
