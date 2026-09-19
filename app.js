@@ -694,25 +694,59 @@ function sanitizeMeetingRich(html){
     const tag=node.tagName.toUpperCase();
     const inner=[...node.childNodes].map(walk).join('');
     if(tag==='STRONG'||tag==='B')return `<strong>${inner}</strong>`;
-    if(tag==='BR')return '<br>';
-    if(tag==='DIV'||tag==='P'){
-      return `${inner}${inner.endsWith('<br>')?'':'<br>'}`;
+    if(tag==='U')return `<u>${inner}</u>`;
+    if(tag==='S'||tag==='STRIKE')return `<s>${inner}</s>`;
+    if(tag==='A'){
+      const raw=node.getAttribute('href')||'';
+      const href=/^https?:\/\//i.test(raw)?raw:'';
+      return href?`<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${inner||esc(href)}</a>`:inner;
     }
+    if(tag==='SPAN' && node.dataset?.meetingSize){
+      const size=['small','normal','large','xlarge'].includes(node.dataset.meetingSize)?node.dataset.meetingSize:'normal';
+      return `<span data-meeting-size="${size}">${inner}</span>`;
+    }
+    if(tag==='BR')return '<br>';
+    if(tag==='DIV'||tag==='P'||tag==='LI')return `${inner}${inner.endsWith('<br>')?'':'<br>'}`;
+    if(tag==='UL'||tag==='OL')return inner;
     return inner;
   };
-  return [...box.childNodes]
-    .map(walk).join('')
-    .replace(/(?:<br>){4,}/g,'<br><br><br>')
-    .replace(/<br>$/,'');
+  return [...box.childNodes].map(walk).join('').replace(/(?:<br>){4,}/g,'<br><br><br>').replace(/<br>$/,'');
 }
 function meetingPlainTextFromHtml(html){
   const box=document.createElement('div');box.innerHTML=String(html||'');return (box.innerText||box.textContent||'').trim();
 }
-window.toggleMeetingBold=()=>{
-  const editor=$('#meetingItemEditor');if(!editor)return;
-  editor.focus();
-  document.execCommand('bold',false,null);
+function meetingEditorCommand(command,value=null){
+  const editor=$('#meetingItemEditor');if(!editor)return;editor.focus();document.execCommand(command,false,value);
+}
+window.toggleMeetingBold=()=>meetingEditorCommand('bold');
+window.toggleMeetingUnderline=()=>meetingEditorCommand('underline');
+window.toggleMeetingStrike=()=>meetingEditorCommand('strikeThrough');
+window.toggleMeetingList=()=>meetingEditorCommand('insertUnorderedList');
+window.setMeetingFontSize=(size)=>{
+  const editor=$('#meetingItemEditor');if(!editor)return;editor.focus();
+  const map={small:'2',normal:'3',large:'4',xlarge:'5'};document.execCommand('fontSize',false,map[size]||'3');
+  editor.querySelectorAll('font[size]').forEach(el=>{const span=document.createElement('span');span.dataset.meetingSize=size;span.innerHTML=el.innerHTML;el.replaceWith(span);});
 };
+window.addMeetingLink=()=>{
+  const editor=$('#meetingItemEditor');if(!editor)return;editor.focus();
+  let url=prompt('연결할 링크를 입력해주세요.','https://');if(!url)return;url=url.trim();if(!/^https?:\/\//i.test(url))url='https://'+url;
+  const sel=window.getSelection();
+  if(sel&&sel.toString())document.execCommand('createLink',false,url);
+  else document.execCommand('insertHTML',false,`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`);
+};
+window.insertMeetingCheckbox=()=>{
+  const editor=$('#meetingItemEditor');if(!editor)return;editor.focus();document.execCommand('insertText',false,'☐ ');
+};
+function bindMeetingEditorShortcuts(meetingId,sectionIndex,itemIndex){
+  const editor=$('#meetingItemEditor');if(!editor)return;
+  editor.addEventListener('keydown',e=>{
+    const mod=e.metaKey||e.ctrlKey;
+    if(mod&&e.key.toLowerCase()==='b'){e.preventDefault();toggleMeetingBold();}
+    else if(mod&&e.key.toLowerCase()==='k'){e.preventDefault();addMeetingLink();}
+    else if(mod&&e.key==='Enter'){e.preventDefault();saveMeetingPopup(meetingId,sectionIndex,itemIndex);}
+    else if(e.key==='Escape'){e.preventDefault();closeMeetingItemModal();}
+  });
+}
 function renderMeetingMonth(year,month,week='1'){
   meetingViewContext={year:Number(year),month:Number(month),week:String(week)};
   $('#meetingLanding').classList.add('hidden');$('#meetingDetail').classList.remove('hidden');
@@ -760,15 +794,29 @@ window.openMeetingItemModal=(meetingId,sectionIndex,itemIndex=null)=>{
       <label><input type="radio" name="meetingFormat" value="bullet" ${current.format!=='check'?'checked':''}><span>● 불릿 <em>(아이디어)</em></span></label>
       <label><input type="radio" name="meetingFormat" value="check" ${current.format==='check'?'checked':''}><span>□ 체크박스 <em>(할일)</em></span></label>
     </div></div>
-    <div class="meeting-popup-group"><label>내용 <em>· 글자를 선택한 뒤 B를 누르면 굵게 표시돼요</em></label>
+    <div class="meeting-popup-group"><label>내용 <em>· 메모장처럼 자유롭게 정리할 수 있어요</em></label>
       <div class="meeting-editor-wrap">
-        <div class="meeting-editor-toolbar"><button type="button" class="meeting-bold-btn" onclick="toggleMeetingBold()" title="굵게"><strong>B</strong></button></div>
+        <div class="meeting-editor-toolbar">
+          <select class="meeting-size-select" onchange="setMeetingFontSize(this.value)" title="글자 크기"><option value="small">작게</option><option value="normal" selected>보통</option><option value="large">크게</option><option value="xlarge">아주 크게</option></select>
+          <span class="meeting-toolbar-sep"></span>
+          <button type="button" class="meeting-tool-btn" onclick="toggleMeetingBold()" title="굵게 (⌘/Ctrl+B)"><strong>B</strong></button>
+          <button type="button" class="meeting-tool-btn" onclick="toggleMeetingUnderline()" title="밑줄"><u>U</u></button>
+          <button type="button" class="meeting-tool-btn" onclick="toggleMeetingStrike()" title="취소선"><s>S</s></button>
+          <span class="meeting-toolbar-sep"></span>
+          <button type="button" class="meeting-tool-btn wide" onclick="toggleMeetingList()" title="불릿 목록">• 목록</button>
+          <button type="button" class="meeting-tool-btn wide" onclick="insertMeetingCheckbox()" title="체크박스">☐ 체크</button>
+          <button type="button" class="meeting-tool-btn wide" onclick="addMeetingLink()" title="링크 (⌘/Ctrl+K)">🔗 링크</button>
+          <span class="meeting-toolbar-spacer"></span>
+          <button type="button" class="meeting-tool-btn" onclick="meetingEditorCommand('undo')" title="실행 취소 (⌘/Ctrl+Z)">↶</button>
+          <button type="button" class="meeting-tool-btn" onclick="meetingEditorCommand('redo')" title="다시 실행 (⌘/Ctrl+Shift+Z)">↷</button>
+        </div>
         <div id="meetingItemEditor" class="meeting-rich-editor" contenteditable="true" data-placeholder="회의 내용을 자유롭게 적어주세요">${sanitizeMeetingRich(current.richHtml||esc(current.text||''))}</div>
+        <div class="meeting-editor-help"><span>⌘/Ctrl+B 굵게</span><span>⌘/Ctrl+K 링크</span><span>⌘/Ctrl+Enter 저장</span><span>Esc 닫기</span></div>
       </div>
     </div>
     <div class="meeting-popup-actions"><button class="outline" onclick="closeMeetingItemModal()">취소</button><button class="accent-btn" onclick="saveMeetingPopup('${meetingId}',${sectionIndex},${itemIndex===null?'null':itemIndex})">저장</button></div>
   </div></div>`;
-  setTimeout(()=>$('#meetingItemEditor')?.focus(),30);
+  setTimeout(()=>{const ed=$('#meetingItemEditor');ed?.focus();bindMeetingEditorShortcuts(meetingId,sectionIndex,itemIndex);},30);
 };
 window.closeMeetingItemModal=()=>{$('#modalRoot').innerHTML='';};
 window.saveMeetingPopup=(meetingId,sectionIndex,itemIndex)=>{
