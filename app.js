@@ -125,7 +125,21 @@ function hydrateState(next){
   Object.keys(state).forEach(k=>delete state[k]);
   Object.assign(state,normalized);
 }
-function persistLocal(){localStorage.setItem('teamDashDataV3',JSON.stringify(state));}
+// Saving safety: keep a local recovery copy and never let an older realtime payload
+// overwrite a change that was just made in this browser.
+const SYNC_CLIENT_ID=sessionStorage.getItem('teamDashClientId')||uid();
+sessionStorage.setItem('teamDashClientId',SYNC_CLIENT_ID);
+let localDirty=false;
+function syncTime(obj){return Number(obj?._sync?.updatedAt||0);}
+function stampLocalChange(){
+  state._sync={...(state._sync||{}),updatedAt:Date.now(),clientId:SYNC_CLIENT_ID};
+  localDirty=true;
+}
+function persistLocal(){
+  const json=JSON.stringify(state);
+  localStorage.setItem('teamDashDataV3',json);
+  localStorage.setItem('teamDashDataV3_backup',json);
+}
 function setCloudStatus(text,tone=''){
   const el=$('#cloudStatus');if(!el)return;
   el.textContent=text;el.className=`cloud-status ${tone}`.trim();
@@ -134,29 +148,46 @@ async function pushCloudNow(){
   if(!cloudReady)return;
   if(cloudSaving){cloudSaveQueued=true;return;}
   cloudSaving=true;cloudSaveQueued=false;setCloudStatus('저장 중…','saving');
+  const snapshot=JSON.parse(JSON.stringify(state));
+  const snapshotTime=syncTime(snapshot);
   try{
-    const {error}=await supabaseClient.from(CLOUD_TABLE).upsert({id:CLOUD_ROW_ID,data:state},{onConflict:'id'});
+    const {error}=await supabaseClient.from(CLOUD_TABLE).upsert({id:CLOUD_ROW_ID,data:snapshot},{onConflict:'id'});
     if(error)throw error;
-    setCloudStatus('동기화됨','ok');
-  }catch(err){console.error(err);setCloudStatus('동기화 오류','error');}
-  finally{
+    // Only mark clean when no newer edit happened while this request was in flight.
+    if(syncTime(state)===snapshotTime)localDirty=false;
+    setCloudStatus(localDirty?'추가 저장 중…':'저장 완료','ok');
+  }catch(err){
+    console.error(err);
+    localDirty=true;
+    setCloudStatus('클라우드 저장 실패 · 이 기기에 보관됨','error');
+  }finally{
     cloudSaving=false;
-    if(cloudSaveQueued){cloudSaveQueued=false;pushCloudNow();}
+    if(cloudSaveQueued||localDirty){cloudSaveQueued=false;setTimeout(()=>pushCloudNow(),350);}
   }
 }
 function queueCloudSave(){if(cloudReady)pushCloudNow();}
-function save(){persistLocal();renderAll();queueCloudSave();}
+function save(){stampLocalChange();persistLocal();renderAll();queueCloudSave();}
 async function loadCloudData(){
   setCloudStatus('불러오는 중…','saving');
+  const localCopy=JSON.parse(localStorage.getItem('teamDashDataV3')||'null');
   const {data,error}=await supabaseClient.from(CLOUD_TABLE).select('id,data').eq('id',CLOUD_ROW_ID).maybeSingle();
   if(error)throw error;
   if(data?.data){
+    // If this browser has a newer timestamp (for example a previous cloud save failed),
+    // keep it instead of destroying it with the older cloud copy.
+    if(localCopy&&syncTime(localCopy)>syncTime(data.data)){
+      hydrateState(localCopy);localDirty=true;persistLocal();renderAll();
+      const {error:upErr}=await supabaseClient.from(CLOUD_TABLE).upsert({id:CLOUD_ROW_ID,data:state},{onConflict:'id'});
+      if(upErr)throw upErr;
+      localDirty=false;setCloudStatus('로컬 복구본 저장 완료','ok');return 'recovered';
+    }
     hydrateState(data.data);persistLocal();renderAll();setCloudStatus('동기화됨','ok');return 'loaded';
   }
   if(HAD_LOCAL_V3){
+    if(!syncTime(state))state._sync={updatedAt:Date.now(),clientId:SYNC_CLIENT_ID};
     const {error:upErr}=await supabaseClient.from(CLOUD_TABLE).upsert({id:CLOUD_ROW_ID,data:state},{onConflict:'id'});
     if(upErr)throw upErr;
-    setCloudStatus('기존 데이터 이전 완료','ok');return 'migrated';
+    persistLocal();setCloudStatus('기존 데이터 이전 완료','ok');return 'migrated';
   }
   setCloudStatus('공용 데이터 없음','error');
   return 'empty';
@@ -165,7 +196,10 @@ function subscribeCloud(){
   if(cloudChannel)supabaseClient.removeChannel(cloudChannel);
   cloudChannel=supabaseClient.channel('dashboard-data-sync')
     .on('postgres_changes',{event:'*',schema:'public',table:CLOUD_TABLE,filter:`id=eq.${CLOUD_ROW_ID}`},payload=>{
-      if(payload.new?.data){hydrateState(payload.new.data);persistLocal();renderAll();setCloudStatus('동기화됨','ok');}
+      const incoming=payload.new?.data;if(!incoming)return;
+      // Never replace an unsaved/newer local edit with a stale realtime event.
+      if(localDirty||syncTime(incoming)<syncTime(state))return;
+      hydrateState(incoming);persistLocal();renderAll();setCloudStatus('동기화됨','ok');
     }).subscribe();
 }
 async function enterDashboard(){
@@ -753,7 +787,7 @@ function renderMeetingMonth(year,month,week='1'){
   const arr=meetingMonthData(year,month);let selected=arr.find(x=>String(x.week||'1')===String(week));
   if(!selected){
     selected={id:uid(),title:`${month}월 ${week}주차 회의`,date:`${year}-${String(month).padStart(2,'0')}-${String(Math.min(28,(Number(week)-1)*7+1)).padStart(2,'0')}`,week:String(week),sections:meetingSectionDefs.map(x=>({...x,items:[]}))};
-    state.meetings.push(selected);persistLocal();queueCloudSave();
+    state.meetings.push(selected);stampLocalChange();persistLocal();queueCloudSave();
   }
   normalizeMeetingSections(selected);
   const activeWeek=String(selected.week||week);
@@ -883,6 +917,7 @@ window.deleteMeetingItem=(meetingId,sectionIndex,itemIndex)=>{
 function saveMeetingAndStay(m){
   const d=new Date(m.date+'T00:00:00');
   meetingViewContext={year:d.getFullYear(),month:d.getMonth()+1,week:String(m.week||'1')};
+  stampLocalChange();
   persistLocal();
   renderMeetingMonth(meetingViewContext.year,meetingViewContext.month,meetingViewContext.week);
   renderHome();
