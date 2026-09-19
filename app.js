@@ -797,7 +797,7 @@ function renderMeetingMonth(year,month,week='1'){
     return `<div class="meeting-item ${obj.format==='check'?'check-item':''} ${obj.checked?'checked-item':''}"><span class="meeting-item-icon">${icon}</span><div class="meeting-item-body"><span>${obj.richHtml?autoLinkHtml(sanitizeMeetingRich(obj.richHtml)):autoLinkText(obj.text||'')}</span></div><div class="meeting-item-actions"><button onclick="editMeetingItem('${selected.id}',${si},${ii})">수정</button><button onclick="deleteMeetingItem('${selected.id}',${si},${ii})">×</button></div></div>`;
   };
   $('#meetingDetail').innerHTML=`<div class="meeting-detail-head"><button class="back-btn" onclick="renderMeetingsLanding()">← 뒤로</button><h1>${year}년 ${month}월 회의록</h1></div>
-  <div class="week-tabs">${['1','2','3','4','5','6'].map(w=>`<button class="${activeWeek===w?'active':''}" onclick="renderMeetingMonth(${year},${month},'${w}')">${w}주차</button>`).join('')}<button class="week-plus" onclick="addMeetingWeek(${year},${month})">+ 주차</button></div>
+  <div class="week-tabs">${['1','2','3','4','5'].map(w=>`<button class="${activeWeek===w?'active':''}" onclick="renderMeetingMonth(${year},${month},'${w}')">${w}주차</button>`).join('')}<button class="week-plus" onclick="addMeetingWeek(${year},${month})">+ 주차</button></div>
   <div class="meeting-meta">${esc(selected.date)} 작성 <button class="del" onclick="deleteMeetingWeek('${selected.id}')">이 주차 삭제</button></div>
   <div class="meeting-sections">${selected.sections.map((sec,si)=>`<section class="meeting-section ${esc(sec.tone)}">
     <h3>${esc(sec.title)}</h3>
@@ -924,7 +924,7 @@ function saveMeetingAndStay(m){
   queueCloudSave();
 }
 window.renderCurrentMeeting=(meetingId)=>{const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;const d=new Date(m.date+'T00:00:00');renderMeetingMonth(d.getFullYear(),d.getMonth()+1,String(m.week||'1'));};
-window.addMeetingWeek=(year,month)=>{const used=new Set(meetingMonthData(year,month).map(x=>String(x.week)));const w=['1','2','3','4','5','6'].find(x=>!used.has(x));if(w)renderMeetingMonth(year,month,w);};
+window.addMeetingWeek=(year,month)=>{const used=new Set(meetingMonthData(year,month).map(x=>String(x.week)));const w=['1','2','3','4','5'].find(x=>!used.has(x));if(w)renderMeetingMonth(year,month,w);};
 
 
 let ideaView='active';
