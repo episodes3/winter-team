@@ -290,7 +290,7 @@ function navigate(id){
 
 function renderHome(){
   const now=kstCalendarDate(),tom=new Date(now);tom.setDate(now.getDate()+1);const weekEnd=new Date(now);weekEnd.setDate(now.getDate()+7);const td=localDate(),tm=`${tom.getFullYear()}-${String(tom.getMonth()+1).padStart(2,'0')}-${String(tom.getDate()).padStart(2,'0')}`;
-  const calendarItems=(state.calendarEvents||[]).filter(x=>x&&x.date).map(x=>({...x,kind:x.type==='leave'?'연차':x.type==='meeting'?'회의':'일정'}));
+  const calendarItems=(state.calendarEvents||[]).filter(x=>x&&x.date).map(x=>({...x,kind:x.type==='leave'?'연차':x.type==='switch'?'스위치':x.type==='meeting'?'회의':'일정'}));
   const renderSchedule=(arr,msg)=>arr.length?arr.slice(0,5).map(x=>`<div class="schedule-item ${channelClass[x.channel]||''}"><span class="bar"></span><div><strong>${esc(x.title)}</strong><small>${esc(x.channel||'전체')} · ${esc(x.kind)}</small></div><time>${shootDates(x).map(d=>fmtDate(d.date)+(d.memo?` ${esc(d.memo)}`:'')).join(' · ')||'-'}</time></div>`).join(''):`<div class="empty">${msg}</div>`;
   const today=calendarItems.filter(x=>x.date===td), tomorrow=calendarItems.filter(x=>x.date===tm), week=state.uploads.filter(x=>x.date&&new Date(x.date+'T00:00:00')>=new Date(td+'T00:00:00')&&new Date(x.date+'T00:00:00')<=weekEnd).sort((a,b)=>a.date.localeCompare(b.date));
   $('#todayCount').textContent=today.length;$('#tomorrowCount').textContent=tomorrow.length;$('#weekCount').textContent=week.length;
@@ -298,7 +298,7 @@ function renderHome(){
   renderHomeTodos();
   $('#memberBoard').innerHTML=members.map(m=>{
     const col=memberColors[m];
-    const memberLeaveEvents=(state.calendarEvents||[]).filter(e=>e.type==='leave'&&(e.member===m||String(e.title||'').startsWith(m+' ')));
+    const memberLeaveEvents=(state.calendarEvents||[]).filter(e=>(e.type==='leave'||e.type==='switch')&&(e.member===m||String(e.title||'').startsWith(m+' ')));
     const onLeaveToday=memberLeaveEvents.some(e=>e.date===td);
     const hasPastCalendarLeave=memberLeaveEvents.some(e=>e.date&&e.date<td);
     const savedWs=state.memberStatus?.[m]||'근무중';
@@ -1442,7 +1442,7 @@ function calendarManualEvents(){
   state.calendarEvents=Array.isArray(state.calendarEvents)?state.calendarEvents:[];
   return state.calendarEvents.filter(x=>x.date).map(x=>({
     source:'manual',
-    type:x.type==='leave'?'leave':(x.type==='meeting'?'meeting':'manual'),
+    type:x.type==='leave'?'leave':(x.type==='switch'?'switch':(x.type==='meeting'?'meeting':'manual')),
     id:x.id,date:x.date,title:x.title||'일정',member:x.member||''
   }));
 }
@@ -1454,7 +1454,7 @@ function calendarEventButton(e){
   if(e.source==='upload') action=`openUploadModal('${e.id}')`;
   else if(e.source==='shoot') action=`openShootModal('${e.id}')`;
   else action=`openCalendarEventModal('${e.id}')`;
-  const icon=e.type==='upload'?'▸':e.type==='shoot'?'●':e.type==='meeting'?'◆':e.type==='leave'?'↻':'•';
+  const icon=e.type==='upload'?'▸':e.type==='shoot'?'●':e.type==='meeting'?'◆':(e.type==='leave'||e.type==='switch')?'↻':'•';
   return `<button type="button" class="cal-event ${e.type}" onclick="event.stopPropagation();${action}" title="${esc(e.title)}"><b>${icon}</b><span>${esc(e.title)}</span></button>`;
 }
 const koreanHoliday2026={
@@ -1522,7 +1522,7 @@ function openCalendarEventModal(id=null,presetDate=''){
   state.calendarEvents=Array.isArray(state.calendarEvents)?state.calendarEvents:[];
   const existing=id?state.calendarEvents.find(x=>x.id===id):null;
   const vals=existing||{title:'',date:presetDate||localDate(),type:'manual',member:'',memo:''};
-  const leave=vals.type==='leave';
+  const leave=vals.type==='leave'||vals.type==='switch';
 
   $('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal cal-modal">
     <div class="modal-head"><div><small>${existing?'일정 수정':'일정 추가'}</small><h3>${existing?esc(vals.title||'일정'):'새 일정 등록'}</h3></div><button class="icon-btn" id="closeModal">×</button></div>
@@ -1536,13 +1536,14 @@ function openCalendarEventModal(id=null,presetDate=''){
         </select></label>
 
         <div class="cal-leave-switch full">
-          <div><b>연차로 등록</b><small>켜면 팀원을 선택해서 연차 일정으로 저장해요.</small></div>
+          <div><b>연차 / 스위치</b><small>켜면 팀원과 휴무 종류를 선택할 수 있어요.</small></div>
           <label class="cal-switch"><input id="calLeaveSwitch" type="checkbox" ${leave?'checked':''}><span></span></label>
         </div>
 
-        <label id="calMemberWrap" class="full ${leave?'':'hidden'}">연차 팀원
-          <select name="member"><option value="">선택</option>${members.map(m=>`<option value="${m}" ${m===vals.member?'selected':''}>${m}</option>`).join('')}</select>
-        </label>
+        <div id="calMemberWrap" class="full cal-leave-options ${leave?'':'hidden'}">
+          <label>구분<select name="leaveKind"><option value="leave" ${vals.type!=='switch'?'selected':''}>연차</option><option value="switch" ${vals.type==='switch'?'selected':''}>스위치</option></select></label>
+          <label>팀원<select name="member"><option value="">선택</option>${members.map(m=>`<option value="${m}" ${m===vals.member?'selected':''}>${m}</option>`).join('')}</select></label>
+        </div>
         <label class="full">메모<textarea name="memo" placeholder="메모가 필요하면 적어주세요">${esc(vals.memo||'')}</textarea></label>
       </div>
       <div class="modal-actions">${existing?'<button type="button" class="danger-btn" id="deleteCalEvent">삭제</button>':'<span></span>'}<span></span><button type="button" class="outline" id="cancelModal">취소</button><button class="accent-btn" type="submit">저장</button></div>
@@ -1557,14 +1558,14 @@ function openCalendarEventModal(id=null,presetDate=''){
   };
   $('#calEventForm').onsubmit=e=>{
     e.preventDefault();
-    const fd=new FormData(e.target),isLeave=sw.checked,member=String(fd.get('member')||'');
+    const fd=new FormData(e.target),isLeave=sw.checked,member=String(fd.get('member')||''),leaveKind=String(fd.get('leaveKind')||'leave');
     const title=String(fd.get('title')||'').trim();
     if(isLeave&&!member){memberWrap.classList.remove('hidden');memberWrap.querySelector('select').focus();return;}
     if(!isLeave&&!title){e.target.querySelector('input[name="title"]').focus();return;}
     const obj={
-      title:isLeave?`${member} 연차`:title,
+      title:isLeave?`${member} ${leaveKind==='switch'?'스위치':'연차'}`:title,
       date:String(fd.get('date')||''),
-      type:isLeave?'leave':String(fd.get('type')||'manual'),
+      type:isLeave?leaveKind:String(fd.get('type')||'manual'),
       member:isLeave?member:'',
       memo:String(fd.get('memo')||'')
     };
