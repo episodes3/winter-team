@@ -125,66 +125,172 @@ function hydrateState(next){
   Object.keys(state).forEach(k=>delete state[k]);
   Object.assign(state,normalized);
 }
-// Shared server is authoritative. Never upload an entire stale browser snapshot.
-const COLLECTIONS=['todos','homeTodos','uploads','shoots','ads','meetings','ideas','notices','schedules','resources','calendarEvents','resourceMemos'];
-const SETTINGS=['memberStatus','memberRemoteDays','adTargets','calendarSchedulesMigrated'];
-let baseline={}, revisions={}, pending=new Map(), syncConflict=false, sending=false, refreshBusy=false, refreshTimer=null;
-const clone=v=>JSON.parse(JSON.stringify(v));
-const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const key=(c,id)=>c+'::'+id;
-function flatten(v){const result={};for(const c of COLLECTIONS)for(const item of (v[c]||[]))if(item&&item.id)result[key(c,String(item.id))]={collection:c,record_id:String(item.id),payload:clone(item)};
-for(const c of SETTINGS)result[key('$settings',c)]={collection:'$settings',record_id:c,payload:clone(v[c]??null)};return result;}
-function persistLocal(){try{localStorage.setItem('teamDashDataV3_backup',JSON.stringify(state));}catch(e){console.warn('Backup failed',e);}}
-function setCloudStatus(t,tone=''){const el=$('#cloudStatus');if(el){el.textContent=t;el.className=`cloud-status ${tone}`.trim();}}
-function captureEdits(){const current=flatten(state);for(const k of new Set([...Object.keys(baseline),...Object.keys(current)])){
-const prev=baseline[k]?.payload, now=current[k]?.payload;
-if(!same(prev,now))pending.set(k,{collection:(current[k]||baseline[k]).collection,record_id:(current[k]||baseline[k]).record_id,payload:now===undefined?null:clone(now),expected_revision:revisions[k]||0});
-else if(pending.has(k))pending.delete(k);
-}}
-function save(){if(syncConflict){alert('동시 수정 충돌이 있습니다. 작성 내용을 먼저 별도로 복사한 뒤 페이지를 새로고침하고 다시 수정해주세요.');return;}captureEdits();persistLocal();renderAll();setCloudStatus('저장 중…','saving');void flushChanges();}
-function overlayPending(){for(const op of pending.values()){
-if(op.collection==='$settings'){state[op.record_id]=clone(op.payload);continue;}
-const arr=state[op.collection]||[];state[op.collection]=arr;
-const i=arr.findIndex(x=>String(x.id)===op.record_id);
-if(op.payload===null){if(i>=0)arr.splice(i,1);}else if(i>=0)arr[i]=clone(op.payload);else arr.push(clone(op.payload));
-}}
-async function readServer(){const {data,error}=await supabaseClient.from('winter_records').select('collection,record_id,payload,revision');if(error)throw error;
-const result=seed();for(const c of COLLECTIONS)result[c]=[];
-const rev={};for(const row of data||[]){const k=key(row.collection,row.record_id);rev[k]=row.revision;
-if(row.collection==='$settings')result[row.record_id]=row.payload;
-else if(COLLECTIONS.includes(row.collection)&&row.payload!==null)result[row.collection].push(row.payload);
-}return {result,rev};}
-async function refreshCloud(){if(refreshBusy||!cloudReady)return;refreshBusy=true;
-try{const {result,rev}=await readServer();const normalized=normalizeState(result);
-baseline=flatten(normalized);revisions=rev;hydrateState(normalized);overlayPending();persistLocal();renderAll();
-if(!pending.size)setCloudStatus('동기화됨','ok');
-}catch(e){console.error(e);setCloudStatus('동기화 오류 · 재시도 필요','error');}finally{refreshBusy=false;}}
-async function flushChanges(){if(sending||syncConflict||!cloudReady||!pending.size)return;
-sending=true;const batch=[...pending.entries()].map(([k,v])=>({k,op:clone(v)}));
-try{for(const {k,op} of batch){
-const {data,error}=await supabaseClient.rpc('winter_apply_record',{p_collection:op.collection,p_record_id:op.record_id,p_payload:op.payload,p_expected_revision:op.expected_revision});
-if(error)throw error;
-if(data===-1){syncConflict=true;setCloudStatus('동시 수정 충돌 · 작성 내용 보존됨','error');alert('다른 팀원이 같은 항목을 먼저 수정했어요. 현재 작성 내용은 이 브라우저에 남아 있습니다. 팀원과 확인한 뒤 다시 저장해주세요.');return;}
-if(pending.get(k)===undefined)continue;
-if(same(pending.get(k).payload,op.payload))pending.delete(k);
-revisions[k]=data; if(op.payload===null)delete baseline[k];else baseline[k]={collection:op.collection,record_id:op.record_id,payload:clone(op.payload)};
-if(pending.has(k))pending.get(k).expected_revision=data;
+// Saving safety: keep a local recovery copy and never let an older realtime payload
+// overwrite a change that was just made in this browser.
+const SYNC_CLIENT_ID=sessionStorage.getItem('teamDashClientId')||uid();
+sessionStorage.setItem('teamDashClientId',SYNC_CLIENT_ID);
+let localDirty=false;
+function syncTime(obj){return Number(obj?._sync?.updatedAt||0);}
+function stampLocalChange(){
+  state._sync={...(state._sync||{}),updatedAt:Date.now(),clientId:SYNC_CLIENT_ID};
+  localDirty=true;
 }
-setCloudStatus(pending.size?'추가 저장 중…':'저장 완료','ok');
-}catch(e){console.error(e);setCloudStatus('저장 실패 · 이 기기에 임시 보관됨','error');}
-finally{sending=false;persistLocal();if(!pending.size)void refreshCloud();else if(!syncConflict)setTimeout(()=>{if(!sending&&pending.size)void flushChanges();},5000);}}
-async function loadCloudData(){setCloudStatus('불러오는 중…','saving');const {result,rev}=await readServer();
-// A missing migration must not cause the browser's old local data to replace team data.
-if(!Object.keys(rev).length)throw new Error('winter_records is empty: run migration SQL first');
-revisions=rev;baseline=flatten(normalizeState(result));hydrateState(result);persistLocal();renderAll();setCloudStatus('동기화됨','ok');}
-function subscribeCloud(){if(cloudChannel)supabaseClient.removeChannel(cloudChannel);
-cloudChannel=supabaseClient.channel('winter-record-sync').on('postgres_changes',{event:'*',schema:'public',table:'winter_records'},()=>{void refreshCloud();}).subscribe();
-// Polling fallback when realtime publication is unavailable.
-if(refreshTimer)clearInterval(refreshTimer);refreshTimer=setInterval(()=>{void refreshCloud();},15000);
-window.addEventListener('online',()=>{void flushChanges();void refreshCloud();});}
+function persistLocal(){
+  const json=JSON.stringify(state);
+  localStorage.setItem('teamDashDataV3',json);
+  localStorage.setItem('teamDashDataV3_backup',json);
+}
+function setCloudStatus(text,tone=''){
+  const el=$('#cloudStatus');if(!el)return;
+  el.textContent=text;el.className=`cloud-status ${tone}`.trim();
+}
+async function pushCloudNow(){
+  if(!cloudReady)return;
+  if(cloudSaving){cloudSaveQueued=true;return;}
+  cloudSaving=true;cloudSaveQueued=false;setCloudStatus('저장 중…','saving');
+  const snapshot=JSON.parse(JSON.stringify(state));
+  const snapshotTime=syncTime(snapshot);
+  try{
+    const {error}=await supabaseClient.from(CLOUD_TABLE).upsert({id:CLOUD_ROW_ID,data:snapshot},{onConflict:'id'});
+    if(error)throw error;
+    // Only mark clean when no newer edit happened while this request was in flight.
+    if(syncTime(state)===snapshotTime)localDirty=false;
+    setCloudStatus(localDirty?'추가 저장 중…':'저장 완료','ok');
+  }catch(err){
+    console.error(err);
+    localDirty=true;
+    setCloudStatus('클라우드 저장 실패 · 이 기기에 보관됨','error');
+  }finally{
+    cloudSaving=false;
+    if(cloudSaveQueued||localDirty){cloudSaveQueued=false;setTimeout(()=>pushCloudNow(),350);}
+  }
+}
+// Meeting notes are authoritative in winter_records, not the legacy whole-dashboard row.
+// Each week is a separate revisioned record; concurrent additions are merged by item ID.
+const meetingRevisions=new Map();
+let meetingChannel=null;
+function prepareMeetingRecord(m){
+  normalizeMeetingSections(m);
+  m.sections.forEach((sec,si)=>sec.items.forEach((item,ii)=>{
+    if(typeof item==='string')sec.items[ii]={id:`legacy-${si}-${ii}`,text:item,richHtml:esc(item),format:'bullet'};
+    else if(!item.id)item.id=`legacy-${si}-${ii}`;
+  }));
+  return m;
+}
+function replaceMeetingRecord(m){
+  const idx=state.meetings.findIndex(x=>x.id===m.id);
+  if(idx>=0)state.meetings[idx]=prepareMeetingRecord(m);
+  else state.meetings.push(prepareMeetingRecord(m));
+}
+async function fetchMeetingRecord(id){
+  const {data,error}=await supabaseClient.from('winter_records').select('payload,revision').eq('collection','meetings').eq('record_id',id).maybeSingle();
+  if(error)throw error;
+  return data;
+}
+async function refreshMeetingRecords(){
+  const {data,error}=await supabaseClient.from('winter_records').select('record_id,payload,revision').eq('collection','meetings');
+  if(error)throw error;
+  const incoming=new Set();
+  (data||[]).forEach(row=>{if(row.payload){incoming.add(row.record_id);meetingRevisions.set(row.record_id,Number(row.revision));replaceMeetingRecord(row.payload);}});
+  // Existing legacy-only meetings can still appear until they are individually saved.
+  persistLocal();
+  if(document.querySelector('#appView:not(.hidden)'))renderAll();
+}
+async function applyMeetingChange(meetingId,change){
+  if(!cloudReady)throw Error('클라우드 연결을 확인해주세요.');
+  for(let attempt=0;attempt<5;attempt++){
+    const row=await fetchMeetingRecord(meetingId);
+    let current=row?.payload?prepareMeetingRecord(structuredClone(row.payload)):null;
+    const revision=Number(row?.revision||0);
+    if(!current){
+      if(!change.template)throw Error('회의록이 서버에 없습니다.');
+      current=prepareMeetingRecord(structuredClone(change.template));
+    }
+    const section=current.sections[change.sectionIndex];
+    if(!section)throw Error('회의록 섹션을 찾지 못했습니다.');
+    if(change.kind==='add'){
+      if(!section.items.some(x=>x.id===change.item.id))section.items.push(change.item);
+    }else{
+      const index=section.items.findIndex(x=>x.id===change.itemId);
+      if(index<0)throw Error('다른 사용자가 이 항목을 삭제했어요. 새로고침 후 확인해주세요.');
+      const remote=section.items[index];
+      if(JSON.stringify(remote)!==JSON.stringify(change.before))throw Error('다른 사용자가 같은 항목을 먼저 수정했어요. 내용을 복사해 둔 뒤 새로고침해주세요.');
+      if(change.kind==='edit')section.items[index]=change.item;
+      if(change.kind==='delete')section.items.splice(index,1);
+    }
+    const {data,error}=await supabaseClient.rpc('winter_apply_record',{
+      p_collection:'meetings',p_record_id:meetingId,p_payload:current,p_expected_revision:revision
+    });
+    if(error)throw error;
+    if(Number(data)===-1)continue;
+    meetingRevisions.set(meetingId,Number(data));
+    replaceMeetingRecord(current);persistLocal();
+    const ctx=meetingViewContext;
+    if(ctx)renderMeetingMonth(ctx.year,ctx.month,ctx.week);
+    renderHome();setCloudStatus('회의록 저장 완료','ok');
+    return;
+  }
+  throw Error('동시에 수정된 내용이 많아 저장하지 못했어요. 다시 시도해주세요.');
+}
+async function createMeetingWeekIfMissing(m){
+  const row=await fetchMeetingRecord(m.id);
+  if(row){replaceMeetingRecord(row.payload);return;}
+  const {data,error}=await supabaseClient.rpc('winter_apply_record',{
+    p_collection:'meetings',p_record_id:m.id,p_payload:prepareMeetingRecord(structuredClone(m)),p_expected_revision:0
+  });
+  if(error)throw error;
+  if(Number(data)===-1){const latest=await fetchMeetingRecord(m.id);if(latest)replaceMeetingRecord(latest.payload);}
+  else meetingRevisions.set(m.id,Number(data));
+}
+function reportMeetingSaveError(err){console.error('Meeting save:',err);setCloudStatus('회의록 저장 실패','error');alert('회의록이 저장되지 않았어요.\n'+(err.message||String(err))+'\n\n입력한 내용을 복사해 두고 다시 시도해주세요.');}
+function queueCloudSave(){if(cloudReady)pushCloudNow();}
+function save(){stampLocalChange();persistLocal();renderAll();queueCloudSave();}
+async function loadCloudData(){
+  setCloudStatus('불러오는 중…','saving');
+  const localCopy=JSON.parse(localStorage.getItem('teamDashDataV3')||'null');
+  const {data,error}=await supabaseClient.from(CLOUD_TABLE).select('id,data').eq('id',CLOUD_ROW_ID).maybeSingle();
+  if(error)throw error;
+  if(data?.data){
+    // If this browser has a newer timestamp (for example a previous cloud save failed),
+    // keep it instead of destroying it with the older cloud copy.
+    if(localCopy&&syncTime(localCopy)>syncTime(data.data)){
+      hydrateState(localCopy);localDirty=true;persistLocal();renderAll();
+      const {error:upErr}=await supabaseClient.from(CLOUD_TABLE).upsert({id:CLOUD_ROW_ID,data:state},{onConflict:'id'});
+      if(upErr)throw upErr;
+      localDirty=false;setCloudStatus('로컬 복구본 저장 완료','ok');return 'recovered';
+    }
+    hydrateState(data.data);persistLocal();renderAll();setCloudStatus('동기화됨','ok');return 'loaded';
+  }
+  if(HAD_LOCAL_V3){
+    if(!syncTime(state))state._sync={updatedAt:Date.now(),clientId:SYNC_CLIENT_ID};
+    const {error:upErr}=await supabaseClient.from(CLOUD_TABLE).upsert({id:CLOUD_ROW_ID,data:state},{onConflict:'id'});
+    if(upErr)throw upErr;
+    persistLocal();setCloudStatus('기존 데이터 이전 완료','ok');return 'migrated';
+  }
+  setCloudStatus('공용 데이터 없음','error');
+  return 'empty';
+}
+function subscribeCloud(){
+  if(cloudChannel)supabaseClient.removeChannel(cloudChannel);
+  cloudChannel=supabaseClient.channel('dashboard-data-sync')
+    .on('postgres_changes',{event:'*',schema:'public',table:CLOUD_TABLE,filter:`id=eq.${CLOUD_ROW_ID}`},payload=>{
+      const incoming=payload.new?.data;if(!incoming)return;
+      // Never replace an unsaved/newer local edit with a stale realtime event.
+      if(localDirty||syncTime(incoming)<syncTime(state))return;
+      const existingMeetings=state.meetings;hydrateState(incoming);state.meetings=existingMeetings;persistLocal();renderAll();setCloudStatus('동기화됨','ok');
+    }).subscribe();
+}
+function subscribeMeetingRecords(){
+  if(meetingChannel)supabaseClient.removeChannel(meetingChannel);
+  meetingChannel=supabaseClient.channel('meeting-record-sync')
+    .on('postgres_changes',{event:'*',schema:'public',table:'winter_records',filter:'collection=eq.meetings'},()=>{
+      // Avoid overwriting an open draft: only refresh after a completed save or when idle.
+      if(!document.querySelector('#meetingItemEditor'))refreshMeetingRecords().catch(console.error);
+    }).subscribe();
+}
 async function enterDashboard(){
   $('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');
-  try{await loadCloudData();cloudReady=true;subscribeCloud();}
+  try{await loadCloudData();await refreshMeetingRecords();cloudReady=true;subscribeCloud();subscribeMeetingRecords();}
   catch(err){console.error(err);cloudReady=false;setCloudStatus('연결 오류','error');$('#loginError').textContent='공용 데이터 연결에 실패했어요. 잠시 후 다시 시도해주세요.';}
 }
 async function handleDashboardLogin(password){
@@ -257,6 +363,7 @@ $('#loginForm').addEventListener('submit',e=>{e.preventDefault();handleDashboard
 supabaseClient.auth.getSession().then(({data})=>{if(data.session)enterDashboard();});
 $$('#nav button').forEach(btn=>btn.addEventListener('click',()=>navigate(btn.dataset.page)));
 function navigate(id){
+  if(id==='meetings'&&cloudReady)refreshMeetingRecords().catch(reportMeetingSaveError);
   $$('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
   $$('.page').forEach(p=>p.classList.toggle('active-page',p.id===id));
   if(id==='meetings'){
@@ -767,9 +874,9 @@ function renderMeetingMonth(year,month,week='1'){
   const arr=meetingMonthData(year,month);let selected=arr.find(x=>String(x.week||'1')===String(week));
   if(!selected){
     selected={id:uid(),title:`${month}월 ${week}주차 회의`,date:`${year}-${String(month).padStart(2,'0')}-${String(Math.min(28,(Number(week)-1)*7+1)).padStart(2,'0')}`,week:String(week),sections:meetingSectionDefs.map(x=>({...x,items:[]}))};
-    state.meetings.push(selected);stampLocalChange();persistLocal();queueCloudSave();
+    state.meetings.push(selected);persistLocal();createMeetingWeekIfMissing(selected).catch(reportMeetingSaveError);
   }
-  normalizeMeetingSections(selected);
+  prepareMeetingRecord(selected);
   const activeWeek=String(selected.week||week);
   const itemHTML=(it,ii,si)=>{
     const obj=typeof it==='string'?{text:it,format:'bullet',mentions:[],related:''}:it;
@@ -786,22 +893,20 @@ function renderMeetingMonth(year,month,week='1'){
   </section>`).join('')}</div>`;
 }
 window.renderMeetingMonth=renderMeetingMonth;window.renderMeetingsLanding=renderMeetingsLanding;
-window.toggleMeetingCheck=(meetingId,sectionIndex,itemIndex)=>{
-  const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;normalizeMeetingSections(m);
-  const raw=m.sections?.[sectionIndex]?.items?.[itemIndex];if(raw==null)return;
-  if(typeof raw==='string'){
-    m.sections[sectionIndex].items[itemIndex]={text:raw,richHtml:esc(raw),format:'check',mentions:[],related:'',checked:true};
-  }else{
-    raw.checked=!Boolean(raw.checked);
-  }
-  persistLocal();queueCloudSave();
-  renderMeetingMonth(new Date(m.date+'T00:00:00').getFullYear(),new Date(m.date+'T00:00:00').getMonth()+1,String(m.week||'1'));
+window.toggleMeetingCheck=async(meetingId,sectionIndex,itemIndex)=>{
+  const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;prepareMeetingRecord(m);
+  const before=structuredClone(m.sections?.[sectionIndex]?.items?.[itemIndex]);if(!before)return;
+  const updated={...before,format:'check',checked:!Boolean(before.checked)};
+  try{await applyMeetingChange(meetingId,{kind:'edit',sectionIndex,itemId:before.id,item:updated,before});}
+  catch(err){reportMeetingSaveError(err);}
 };
 
 window.openMeetingItemModal=(meetingId,sectionIndex,itemIndex=null)=>{
   const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;normalizeMeetingSections(m);
   const sec=m.sections[sectionIndex];const raw=itemIndex===null?null:sec.items[itemIndex];
-  const current=typeof raw==='string'?{text:raw,richHtml:esc(raw),format:'bullet'}:({...raw}); current.richHtml=current.richHtml||esc(current.text||'');
+  const current=typeof raw==='string'?{id:`legacy-${sectionIndex}-${itemIndex}`,text:raw,richHtml:esc(raw),format:'bullet'}:({...raw});
+  window.meetingEditBaseline=itemIndex===null?null:structuredClone(current);
+  current.richHtml=current.richHtml||esc(current.text||'');
   $('#modalRoot').innerHTML=`<div class="modal-backdrop meeting-modal-backdrop"><div class="meeting-item-modal">
     <div class="meeting-popup-head"><h3>${itemIndex===null?'항목 추가':'항목 수정'}</h3><button class="icon-btn" onclick="closeMeetingItemModal()">×</button></div>
     <div class="meeting-popup-group"><label>형식</label><div class="format-options">
@@ -831,17 +936,28 @@ window.openMeetingItemModal=(meetingId,sectionIndex,itemIndex=null)=>{
   setTimeout(()=>{const ed=$('#meetingItemEditor');ed?.focus();bindMeetingEditorShortcuts(meetingId,sectionIndex,itemIndex);},30);
 };
 window.closeMeetingItemModal=()=>{$('#modalRoot').innerHTML='';};
-window.saveMeetingPopup=(meetingId,sectionIndex,itemIndex)=>{
-  const editor=$('#meetingItemEditor');const richHtml=sanitizeMeetingRich(editor?.innerHTML||'');const text=meetingPlainTextFromHtml(richHtml);if(!text){editor?.focus();return;}
-  const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;normalizeMeetingSections(m);
+window.saveMeetingPopup=async(meetingId,sectionIndex,itemIndex)=>{
+  const editor=$('#meetingItemEditor');
+  const richHtml=sanitizeMeetingRich(editor?.innerHTML||'');
+  const text=meetingPlainTextFromHtml(richHtml)||editor?.textContent?.trim()||'';
+  if(!text){alert('내용을 입력해주세요.');editor?.focus();return;}
+  const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;
+  prepareMeetingRecord(m);
   const format=document.querySelector('input[name="meetingFormat"]:checked')?.value||'bullet';
-  const existing=itemIndex===null||itemIndex==='null'?null:m.sections[sectionIndex].items[Number(itemIndex)];
-  const obj={text,richHtml,format,checked:format==='check'&&existing&&typeof existing==='object'?Boolean(existing.checked):false};
-  if(itemIndex===null||itemIndex==='null')m.sections[sectionIndex].items.push(obj);else m.sections[sectionIndex].items[Number(itemIndex)]=obj;
-  closeMeetingItemModal();saveMeetingAndStay(m);
+  const isNew=itemIndex===null||itemIndex==='null';
+  const before=isNew?null:window.meetingEditBaseline;
+  const obj={id:isNew?uid():before.id,text,richHtml,format,checked:format==='check'&&before?Boolean(before.checked):false};
+  const button=document.querySelector('.meeting-popup-actions .accent-btn');if(button)button.disabled=true;
+  setCloudStatus('회의록 저장 중…','saving');
+  try{
+    await applyMeetingChange(meetingId,{kind:isNew?'add':'edit',sectionIndex,item:obj,itemId:obj.id,before,template:m});
+    closeMeetingItemModal();
+  }catch(err){reportMeetingSaveError(err);}
+  finally{if(button?.isConnected)button.disabled=false;}
 };
 window.editMeetingItem=(meetingId,sectionIndex,itemIndex)=>openMeetingItemModal(meetingId,sectionIndex,itemIndex);
 window.deleteMeetingWeek=(meetingId)=>{
+  alert('데이터 보호를 위해 주차 전체 삭제는 일시 중지했어요. 개별 항목 삭제를 이용해주세요.');return;
   const index=state.meetings.findIndex(x=>x.id===meetingId);
   if(index<0)return;
   const removed=state.meetings[index];
@@ -880,19 +996,12 @@ window.deleteMeetingWeek=(meetingId)=>{
   });
 };
 
-window.deleteMeetingItem=(meetingId,sectionIndex,itemIndex)=>{
-  const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;
-  normalizeMeetingSections(m);
-  const items=m.sections?.[sectionIndex]?.items;if(!items||!items[itemIndex])return;
-  const removed=items[itemIndex];
-  items.splice(itemIndex,1);saveMeetingAndStay(m);
-  showDeleteUndo('회의록 항목이 삭제되었습니다',()=>{
-    const meeting=state.meetings.find(x=>x.id===meetingId);if(!meeting)return;
-    normalizeMeetingSections(meeting);
-    const restoreItems=meeting.sections?.[sectionIndex]?.items;if(!restoreItems)return;
-    restoreItems.splice(Math.min(itemIndex,restoreItems.length),0,removed);
-    saveMeetingAndStay(meeting);
-  });
+window.deleteMeetingItem=async(meetingId,sectionIndex,itemIndex)=>{
+  const m=state.meetings.find(x=>x.id===meetingId);if(!m)return;prepareMeetingRecord(m);
+  const before=structuredClone(m.sections?.[sectionIndex]?.items?.[itemIndex]);if(!before)return;
+  if(!confirm('이 회의록 항목을 삭제할까요?'))return;
+  try{await applyMeetingChange(meetingId,{kind:'delete',sectionIndex,itemId:before.id,before});}
+  catch(err){reportMeetingSaveError(err);}
 };
 function saveMeetingAndStay(m){
   const d=new Date(m.date+'T00:00:00');
