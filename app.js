@@ -125,83 +125,63 @@ function hydrateState(next){
   Object.keys(state).forEach(k=>delete state[k]);
   Object.assign(state,normalized);
 }
-// Saving safety: keep a local recovery copy and never let an older realtime payload
-// overwrite a change that was just made in this browser.
-const SYNC_CLIENT_ID=sessionStorage.getItem('teamDashClientId')||uid();
-sessionStorage.setItem('teamDashClientId',SYNC_CLIENT_ID);
-let localDirty=false;
-function syncTime(obj){return Number(obj?._sync?.updatedAt||0);}
-function stampLocalChange(){
-  state._sync={...(state._sync||{}),updatedAt:Date.now(),clientId:SYNC_CLIENT_ID};
-  localDirty=true;
+// Shared server is authoritative. Never upload an entire stale browser snapshot.
+const COLLECTIONS=['todos','homeTodos','uploads','shoots','ads','meetings','ideas','notices','schedules','resources','calendarEvents','resourceMemos'];
+const SETTINGS=['memberStatus','memberRemoteDays','adTargets','calendarSchedulesMigrated'];
+let baseline={}, revisions={}, pending=new Map(), syncConflict=false, sending=false, refreshBusy=false, refreshTimer=null;
+const clone=v=>JSON.parse(JSON.stringify(v));
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const key=(c,id)=>c+'::'+id;
+function flatten(v){const result={};for(const c of COLLECTIONS)for(const item of (v[c]||[]))if(item&&item.id)result[key(c,String(item.id))]={collection:c,record_id:String(item.id),payload:clone(item)};
+for(const c of SETTINGS)result[key('$settings',c)]={collection:'$settings',record_id:c,payload:clone(v[c]??null)};return result;}
+function persistLocal(){try{localStorage.setItem('teamDashDataV3_backup',JSON.stringify(state));}catch(e){console.warn('Backup failed',e);}}
+function setCloudStatus(t,tone=''){const el=$('#cloudStatus');if(el){el.textContent=t;el.className=`cloud-status ${tone}`.trim();}}
+function captureEdits(){const current=flatten(state);for(const k of new Set([...Object.keys(baseline),...Object.keys(current)])){
+const prev=baseline[k]?.payload, now=current[k]?.payload;
+if(!same(prev,now))pending.set(k,{collection:(current[k]||baseline[k]).collection,record_id:(current[k]||baseline[k]).record_id,payload:now===undefined?null:clone(now),expected_revision:revisions[k]||0});
+else if(pending.has(k))pending.delete(k);
+}}
+function save(){if(syncConflict){alert('동시 수정 충돌이 있습니다. 작성 내용을 먼저 별도로 복사한 뒤 페이지를 새로고침하고 다시 수정해주세요.');return;}captureEdits();persistLocal();renderAll();setCloudStatus('저장 중…','saving');void flushChanges();}
+function overlayPending(){for(const op of pending.values()){
+if(op.collection==='$settings'){state[op.record_id]=clone(op.payload);continue;}
+const arr=state[op.collection]||[];state[op.collection]=arr;
+const i=arr.findIndex(x=>String(x.id)===op.record_id);
+if(op.payload===null){if(i>=0)arr.splice(i,1);}else if(i>=0)arr[i]=clone(op.payload);else arr.push(clone(op.payload));
+}}
+async function readServer(){const {data,error}=await supabaseClient.from('winter_records').select('collection,record_id,payload,revision');if(error)throw error;
+const result=seed();for(const c of COLLECTIONS)result[c]=[];
+const rev={};for(const row of data||[]){const k=key(row.collection,row.record_id);rev[k]=row.revision;
+if(row.collection==='$settings')result[row.record_id]=row.payload;
+else if(COLLECTIONS.includes(row.collection)&&row.payload!==null)result[row.collection].push(row.payload);
+}return {result,rev};}
+async function refreshCloud(){if(refreshBusy||!cloudReady)return;refreshBusy=true;
+try{const {result,rev}=await readServer();const normalized=normalizeState(result);
+baseline=flatten(normalized);revisions=rev;hydrateState(normalized);overlayPending();persistLocal();renderAll();
+if(!pending.size)setCloudStatus('동기화됨','ok');
+}catch(e){console.error(e);setCloudStatus('동기화 오류 · 재시도 필요','error');}finally{refreshBusy=false;}}
+async function flushChanges(){if(sending||syncConflict||!cloudReady||!pending.size)return;
+sending=true;const batch=[...pending.entries()].map(([k,v])=>({k,op:clone(v)}));
+try{for(const {k,op} of batch){
+const {data,error}=await supabaseClient.rpc('winter_apply_record',{p_collection:op.collection,p_record_id:op.record_id,p_payload:op.payload,p_expected_revision:op.expected_revision});
+if(error)throw error;
+if(data===-1){syncConflict=true;setCloudStatus('동시 수정 충돌 · 작성 내용 보존됨','error');alert('다른 팀원이 같은 항목을 먼저 수정했어요. 현재 작성 내용은 이 브라우저에 남아 있습니다. 팀원과 확인한 뒤 다시 저장해주세요.');return;}
+if(pending.get(k)===undefined)continue;
+if(same(pending.get(k).payload,op.payload))pending.delete(k);
+revisions[k]=data; if(op.payload===null)delete baseline[k];else baseline[k]={collection:op.collection,record_id:op.record_id,payload:clone(op.payload)};
+if(pending.has(k))pending.get(k).expected_revision=data;
 }
-function persistLocal(){
-  const json=JSON.stringify(state);
-  localStorage.setItem('teamDashDataV3',json);
-  localStorage.setItem('teamDashDataV3_backup',json);
-}
-function setCloudStatus(text,tone=''){
-  const el=$('#cloudStatus');if(!el)return;
-  el.textContent=text;el.className=`cloud-status ${tone}`.trim();
-}
-async function pushCloudNow(){
-  if(!cloudReady)return;
-  if(cloudSaving){cloudSaveQueued=true;return;}
-  cloudSaving=true;cloudSaveQueued=false;setCloudStatus('저장 중…','saving');
-  const snapshot=JSON.parse(JSON.stringify(state));
-  const snapshotTime=syncTime(snapshot);
-  try{
-    const {error}=await supabaseClient.from(CLOUD_TABLE).upsert({id:CLOUD_ROW_ID,data:snapshot},{onConflict:'id'});
-    if(error)throw error;
-    // Only mark clean when no newer edit happened while this request was in flight.
-    if(syncTime(state)===snapshotTime)localDirty=false;
-    setCloudStatus(localDirty?'추가 저장 중…':'저장 완료','ok');
-  }catch(err){
-    console.error(err);
-    localDirty=true;
-    setCloudStatus('클라우드 저장 실패 · 이 기기에 보관됨','error');
-  }finally{
-    cloudSaving=false;
-    if(cloudSaveQueued||localDirty){cloudSaveQueued=false;setTimeout(()=>pushCloudNow(),350);}
-  }
-}
-function queueCloudSave(){if(cloudReady)pushCloudNow();}
-function save(){stampLocalChange();persistLocal();renderAll();queueCloudSave();}
-async function loadCloudData(){
-  setCloudStatus('불러오는 중…','saving');
-  const localCopy=JSON.parse(localStorage.getItem('teamDashDataV3')||'null');
-  const {data,error}=await supabaseClient.from(CLOUD_TABLE).select('id,data').eq('id',CLOUD_ROW_ID).maybeSingle();
-  if(error)throw error;
-  if(data?.data){
-    // If this browser has a newer timestamp (for example a previous cloud save failed),
-    // keep it instead of destroying it with the older cloud copy.
-    if(localCopy&&syncTime(localCopy)>syncTime(data.data)){
-      hydrateState(localCopy);localDirty=true;persistLocal();renderAll();
-      const {error:upErr}=await supabaseClient.from(CLOUD_TABLE).upsert({id:CLOUD_ROW_ID,data:state},{onConflict:'id'});
-      if(upErr)throw upErr;
-      localDirty=false;setCloudStatus('로컬 복구본 저장 완료','ok');return 'recovered';
-    }
-    hydrateState(data.data);persistLocal();renderAll();setCloudStatus('동기화됨','ok');return 'loaded';
-  }
-  if(HAD_LOCAL_V3){
-    if(!syncTime(state))state._sync={updatedAt:Date.now(),clientId:SYNC_CLIENT_ID};
-    const {error:upErr}=await supabaseClient.from(CLOUD_TABLE).upsert({id:CLOUD_ROW_ID,data:state},{onConflict:'id'});
-    if(upErr)throw upErr;
-    persistLocal();setCloudStatus('기존 데이터 이전 완료','ok');return 'migrated';
-  }
-  setCloudStatus('공용 데이터 없음','error');
-  return 'empty';
-}
-function subscribeCloud(){
-  if(cloudChannel)supabaseClient.removeChannel(cloudChannel);
-  cloudChannel=supabaseClient.channel('dashboard-data-sync')
-    .on('postgres_changes',{event:'*',schema:'public',table:CLOUD_TABLE,filter:`id=eq.${CLOUD_ROW_ID}`},payload=>{
-      const incoming=payload.new?.data;if(!incoming)return;
-      // Never replace an unsaved/newer local edit with a stale realtime event.
-      if(localDirty||syncTime(incoming)<syncTime(state))return;
-      hydrateState(incoming);persistLocal();renderAll();setCloudStatus('동기화됨','ok');
-    }).subscribe();
-}
+setCloudStatus(pending.size?'추가 저장 중…':'저장 완료','ok');
+}catch(e){console.error(e);setCloudStatus('저장 실패 · 이 기기에 임시 보관됨','error');}
+finally{sending=false;persistLocal();if(!pending.size)void refreshCloud();else if(!syncConflict)setTimeout(()=>{if(!sending&&pending.size)void flushChanges();},5000);}}
+async function loadCloudData(){setCloudStatus('불러오는 중…','saving');const {result,rev}=await readServer();
+// A missing migration must not cause the browser's old local data to replace team data.
+if(!Object.keys(rev).length)throw new Error('winter_records is empty: run migration SQL first');
+revisions=rev;baseline=flatten(normalizeState(result));hydrateState(result);persistLocal();renderAll();setCloudStatus('동기화됨','ok');}
+function subscribeCloud(){if(cloudChannel)supabaseClient.removeChannel(cloudChannel);
+cloudChannel=supabaseClient.channel('winter-record-sync').on('postgres_changes',{event:'*',schema:'public',table:'winter_records'},()=>{void refreshCloud();}).subscribe();
+// Polling fallback when realtime publication is unavailable.
+if(refreshTimer)clearInterval(refreshTimer);refreshTimer=setInterval(()=>{void refreshCloud();},15000);
+window.addEventListener('online',()=>{void flushChanges();void refreshCloud();});}
 async function enterDashboard(){
   $('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');
   try{await loadCloudData();cloudReady=true;subscribeCloud();}
