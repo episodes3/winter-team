@@ -227,6 +227,9 @@
 .upload-mini-task:hover{background:#f5fafc}
 
 /* Home To Do List V3.16 */
+.home-weekly-reminders{padding:16px 20px;border:1px solid #e8e8e5;border-radius:14px;background:#fafaf8}
+.home-weekly-reminders h3{margin:0 0 8px;font-size:14px}
+.home-weekly-reminders ul{margin:0;padding-inline-start:1.25em;font-size:13px;line-height:1.7}
 .home-todo-section{margin:18px 0 20px;padding:18px 20px;border:1px solid #e8e8e5;border-radius:14px;background:#fff}
 .home-todo-head{margin:0 0 12px}
 .home-todo-head h3{font-size:15px}
