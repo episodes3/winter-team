@@ -9,7 +9,7 @@ let cloudReady=false;
 let cloudSaving=false;
 let cloudSaveQueued=false;
 let cloudChannel=null;
-const members=['윈터','파타','다나','에렌','키엘','브루나'];
+const members=['윈터','파타','다나','에렌','키엘','브루나','밀리'];
 const ideaCategories=['패션','뷰티','브이로그','예능','기타'];
 const adManagers=['로건','메이브','젤라'];
 const channels=['주우재','이혜영','도운'];
@@ -26,7 +26,8 @@ const meetingSectionDefs=[
 ];
 const memberColors={
   '윈터': {bg:'#eef8ff', line:'#68b7e8'},'파타': {bg:'#eef9f0', line:'#69b879'},'다나': {bg:'#fff0f6', line:'#ed7eaa'},
-  '에렌': {bg:'#fff3e8', line:'#ee9850'},'키엘':{bg:'#fff8e6',line:'#f3b940'},'브루나':{bg:'#f7f0fc',line:'#bb8ddd'}
+  '에렌': {bg:'#fff3e8', line:'#ee9850'},'키엘':{bg:'#fff8e6',line:'#f3b940'},'브루나':{bg:'#f7f0fc',line:'#bb8ddd'},
+  '밀리': {bg:'#e8f7f5', line:'#16867d'}
 };
 const channelClass={'주우재':'joo','이혜영':'hye','도운':'dow','전체':'all'};
 const channelLabel={'주우재':'주우재','이혜영':'이혜영','도운':'도운'};
