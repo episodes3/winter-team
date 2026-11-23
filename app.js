@@ -291,7 +291,7 @@ function subscribeMeetingRecords(){
 }
 async function enterDashboard(){
   $('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');
-  try{await loadCloudData();await refreshMeetingRecords();cloudReady=true;subscribeCloud();subscribeMeetingRecords();}
+  try{await loadCloudData();await refreshMeetingRecords();cloudReady=true;subscribeCloud();subscribeMeetingRecords();renderHome();}
   catch(err){console.error(err);cloudReady=false;setCloudStatus('연결 오류','error');$('#loginError').textContent='공용 데이터 연결에 실패했어요. 잠시 후 다시 시도해주세요.';}
 }
 async function handleDashboardLogin(password){
@@ -376,7 +376,23 @@ function navigate(id){
   window.scrollTo({top:0,behavior:'instant'});
 }
 
+// The static dashboard checks monthly tasks after cloud hydration and while open.
+function ensureMonthlySettlementTodo(){
+  if(!cloudReady)return false;
+  const month=localDate().slice(0,7);
+  if(month<'2026-12')return false;
+  const id='monthly-bruna-epidemic-'+month;
+  const issued=state.monthlySettlementTodos||[];
+  if(issued.includes(month))return false;
+  state.monthlySettlementTodos=[...issued,month];
+  if(!state.todos.some(todo=>todo.id===id)){
+    state.todos.push({id,assignee:'브루나',channel:'주우재',title:'주우재_에피데믹 정산(10일)',due:month+'-10',status:'진행중'});
+  }
+  stampLocalChange();persistLocal();queueCloudSave();
+  return true;
+}
 function renderHome(){
+  ensureMonthlySettlementTodo();
   const now=kstCalendarDate(),tom=new Date(now);tom.setDate(now.getDate()+1);const weekEnd=new Date(now);weekEnd.setDate(now.getDate()+7);const td=localDate(),tm=`${tom.getFullYear()}-${String(tom.getMonth()+1).padStart(2,'0')}-${String(tom.getDate()).padStart(2,'0')}`;
   const calendarItems=(state.calendarEvents||[]).filter(x=>x&&x.date).map(x=>({...x,kind:x.type==='leave'?'연차':x.type==='switch'?'스위치':x.type==='meeting'?'회의':'일정'}));
   const dailySchedule=date=>[
@@ -665,10 +681,13 @@ function renderShoots(){
   const total=state.shoots.length,pdSelf=state.shoots.filter(x=>x.method==='PD 자체 촬영').length,crew=state.shoots.filter(x=>x.method==='촬영팀 동행').length,self=state.shoots.filter(x=>x.method==='셀프캠').length;
   $('#shootSummary').innerHTML=`<div class="summary-box green"><small>🎥 PD 자체 촬영</small><strong>${pdSelf}건</strong><span>/ 촬영 ${total}건 · ${total?Math.round(pdSelf/total*100):0}%</span></div><div class="summary-box"><small>🎥 촬영팀 동행</small><strong>${crew}건</strong><span>/ ${total?Math.round(crew/total*100):0}%</span></div><div class="summary-box gray"><small>🦿 해당없음 (셀프캠)</small><strong>${self}건</strong><span>비율 제외</span></div>`;
   $('#shootColumns').innerHTML=channels.map(ch=>{
-    const arr=state.shoots.filter(x=>x.channel===ch).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-    const limit=shootVisibleCounts[ch]||10,shown=arr.slice(0,limit),remain=Math.max(0,arr.length-limit),next=Math.min(10,remain);
+    const arr=state.shoots.filter(x=>x.channel===ch).sort((a,b)=>{
+      const latestDate=shoot=>shootDates(shoot).map(day=>day.date).sort().pop()||'';
+      return latestDate(a).localeCompare(latestDate(b));
+    });
+    const limit=shootVisibleCounts[ch]||10,shown=arr.slice(-limit),remain=Math.max(0,arr.length-limit),next=Math.min(10,remain);
     const cards=shown.length?shown.map(x=>`<article class="shoot-card ${channelClass[ch]}" onclick="editItem('shoots','${x.id}')"><div class="shoot-card-head"><h4>${esc(x.title)}</h4><time>${shootDates(x).map(d=>fmtDate(d.date)+(d.memo?` ${esc(d.memo)}`:'')).join(' · ')||'-'}</time></div><div class="crew-chips">${shootMembers(x).map(shootPdChip).join('')}${shootCrewChips(x.crew)}${x.selfCam||x.method==='셀프캠'?'<span class="shoot-person-chip shoot-selfcam-chip">셀프캠</span>':''}</div><small>${esc(x.method||'촬영 방식 미정')}</small>${x.notes?`<em>${esc(x.notes)}</em>`:''}</article>`).join(''):'<div class="empty">등록된 촬영이 없어요.</div>';
-    return `<section class="channel-col"><h3>${channelPill(ch)}</h3><p>촬영 ${arr.length}건</p><div class="shoot-list">${cards}</div>${remain?`<button class="shoot-more-btn" onclick="showMoreShoots('${ch}')">지난 촬영 ${next}건 펼치기 <span>↓</span></button>`:''}</section>`;
+    return `<section class="channel-col"><h3>${channelPill(ch)}</h3><p>촬영 ${arr.length}건</p>${remain?`<button class="shoot-more-btn" onclick="showMoreShoots('${ch}')">지난 촬영 ${next}건 펼치기 <span>↑</span></button>`:''}<div class="shoot-list">${cards}</div></section>`;
   }).join('');
 }
 window.showMoreShoots=ch=>{shootVisibleCounts[ch]=(shootVisibleCounts[ch]||10)+10;renderShoots();};
@@ -1766,6 +1785,7 @@ function applyGlobalSearch(){
 $('#globalSearch').addEventListener('input',applyGlobalSearch);
 $('#exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='우리팀-잘-굴러가유-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);};
 $('#todayLabel').textContent=new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date());
+setInterval(()=>{if(cloudReady&&!document.hidden)renderHome();},60000);
 window.addEventListener('focus',()=>renderHome());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)renderHome();});
 renderAll();
